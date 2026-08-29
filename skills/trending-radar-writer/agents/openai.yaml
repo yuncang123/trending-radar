@@ -1,0 +1,4 @@
+interface:
+  display_name: "Trending Radar Writer"
+  short_description: "Write a fact-preserving Trending Radar draft"
+  default_prompt: "Use $trending-radar-writer to process a saved Trending Radar draft-input.json."

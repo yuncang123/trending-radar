@@ -1,0 +1,45 @@
+{
+  "profileId": "example",
+  "version": "v1",
+  "outputDirectory": "Trending Radar",
+  "sources": [
+    {
+      "sourceId": "github-changelog",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://github.blog/changelog/feed/"
+    },
+    {
+      "sourceId": "manual-article",
+      "kind": "url",
+      "enabled": false,
+      "url": "https://example.com/article"
+    },
+    {
+      "sourceId": "github-obsidian-plugins",
+      "kind": "github",
+      "enabled": true,
+      "query": "obsidian plugin",
+      "limit": 20,
+      "pages": 1
+    },
+    {
+      "sourceId": "hn-top",
+      "kind": "hn",
+      "enabled": true,
+      "mode": "topstories",
+      "limit": 20
+    },
+    {
+      "sourceId": "chinese-provider",
+      "kind": "rsshub-compatible",
+      "enabled": false,
+      "url": "https://your-rsshub.example/route"
+    }
+  ],
+  "topics": ["software", "open source"],
+  "filter": {
+    "maxItems": 50
+  },
+  "templateId": "default"
+}

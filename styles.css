@@ -1,0 +1,221 @@
+.trending-radar-status {
+  white-space: pre-wrap;
+}
+
+.trending-radar-settings {
+  --tr-radar-accent: var(--interactive-accent);
+  --tr-radar-border: var(--background-modifier-border);
+  --tr-radar-surface: var(--background-secondary);
+  max-width: 980px;
+  padding-bottom: 48px;
+}
+
+.trending-radar-loading,
+.trending-radar-empty {
+  color: var(--text-muted);
+  padding: 16px 0;
+}
+
+.trending-radar-section {
+  border-top: 1px solid var(--tr-radar-border);
+  padding: 26px 0 18px;
+}
+
+.trending-radar-section:first-child {
+  border-top: 0;
+  padding-top: 8px;
+}
+
+.trending-radar-section-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.trending-radar-section-heading h3 {
+  font-size: var(--font-ui-large);
+  line-height: 1.3;
+  margin: 0;
+}
+
+.trending-radar-section-heading p {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+  margin: 4px 0 0;
+}
+
+.trending-radar-section-icon {
+  align-items: center;
+  color: var(--tr-radar-accent);
+  display: inline-flex;
+  flex: 0 0 24px;
+  height: 24px;
+  justify-content: center;
+}
+
+.trending-radar-section-icon svg {
+  height: 20px;
+  width: 20px;
+}
+
+.trending-radar-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 18px;
+}
+
+.trending-radar-toolbar button {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+}
+
+.trending-radar-source-group {
+  margin: 14px 0 20px;
+}
+
+.trending-radar-source-group > summary {
+  cursor: pointer;
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+  margin-bottom: 10px;
+}
+
+.trending-radar-source-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.trending-radar-source-card {
+  background: var(--tr-radar-surface);
+  border: 1px solid var(--tr-radar-border);
+  border-radius: 6px;
+  min-width: 0;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.trending-radar-source-card.is-enabled {
+  border-color: var(--interactive-accent);
+}
+
+.trending-radar-source-card .setting-item {
+  border-top: 0;
+  padding: 12px;
+}
+
+.trending-radar-source-card .setting-item-info,
+.trending-radar-source-card .setting-item-name,
+.trending-radar-source-card .setting-item-description {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.trending-radar-source-card .setting-item-control {
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.trending-radar-source-card .clickable-icon,
+.trending-radar-topic button {
+  align-items: center;
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.trending-radar-topic-list {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 8px;
+  min-height: 32px;
+}
+
+.trending-radar-topic {
+  align-items: center;
+  background: var(--background-modifier-hover);
+  border: 1px solid var(--tr-radar-border);
+  border-radius: 6px;
+  display: inline-flex;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 32px;
+  padding-left: 10px;
+}
+
+.trending-radar-topic > span {
+  overflow-wrap: anywhere;
+}
+
+.trending-radar-topic button {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--text-muted);
+  padding: 0;
+}
+
+.trending-radar-empty-inline {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.trending-radar-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.trending-radar-modal-error {
+  color: var(--text-error);
+  font-size: var(--font-ui-small);
+  min-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.trending-radar-source-modal .setting-item-control input,
+.trending-radar-settings .setting-item-control input[type="text"],
+.trending-radar-settings .setting-item-control input[type="password"] {
+  max-width: 100%;
+  min-width: 180px;
+}
+
+@media (max-width: 760px) {
+  .trending-radar-source-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trending-radar-section .setting-item,
+  .trending-radar-source-modal .setting-item {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .trending-radar-section .setting-item-control,
+  .trending-radar-source-modal .setting-item-control {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .trending-radar-settings .setting-item-control input[type="text"],
+  .trending-radar-settings .setting-item-control input[type="password"],
+  .trending-radar-source-modal .setting-item-control input {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trending-radar-source-card {
+    transition: none;
+  }
+}
