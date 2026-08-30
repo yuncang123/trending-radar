@@ -1,0 +1,61 @@
+{
+  "profileId": "chinese-tech-v1",
+  "version": "v1",
+  "outputDirectory": "Trending Radar",
+  "sources": [
+    {
+      "sourceId": "cn-sspai",
+      "label": "少数派",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://sspai.com/feed",
+      "limit": 10
+    },
+    {
+      "sourceId": "cn-solidot",
+      "label": "Solidot 奇客",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://www.solidot.org/index.rss",
+      "limit": 10
+    },
+    {
+      "sourceId": "cn-infoq",
+      "label": "InfoQ 中文",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://www.infoq.cn/feed",
+      "limit": 10
+    },
+    {
+      "sourceId": "cn-qbitai",
+      "label": "量子位",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://www.qbitai.com/feed",
+      "limit": 10
+    },
+    {
+      "sourceId": "cn-oschina",
+      "label": "开源中国",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://www.oschina.net/news/rss",
+      "limit": 10
+    },
+    {
+      "sourceId": "cn-cnblogs",
+      "label": "博客园",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://feed.cnblogs.com/blog/sitehome/rss",
+      "limit": 10
+    }
+  ],
+  "topics": ["AI", "Agent", "MCP", "大模型", "开发工具", "开源", "产品"],
+  "filter": {
+    "maxItems": 50,
+    "requireTopicMatch": false
+  },
+  "templateId": "default"
+}
