@@ -25,6 +25,11 @@ and does not rely on a public RSSHub instance. The earlier six-source set remain
 item counts, newest publication time, freshness, and structured failures; the v2 smoke passes when at
 least eight sources have an item published within the last 14 days.
 
+For optional third-party discovery, use `profiles/chinese-third-party-v1.json` and read
+`THIRD-PARTY-SOURCES.md` first. It contains one enabled Google News RSS discovery feed and one
+disabled self-hosted RSSHub template. This profile is intentionally separate from the default
+direct-feed baseline and is not included in the Chinese source smoke.
+
 Development follows the official Obsidian sample plugin shape:
 
 ```text

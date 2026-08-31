@@ -29,3 +29,20 @@ test("Chinese Source Pack v1 remains available as a stable baseline", () => {
   assert.equal(profile.profileId, "chinese-tech-v1");
   assert.equal(profile.sources.filter((source) => source.enabled).length, 6);
 });
+
+test("third-party source profile keeps discovery and self-hosted routes opt-in", () => {
+  const raw = readFileSync(resolve("profiles/chinese-third-party-v1.json"), "utf8");
+  const profile = parseProfile(JSON.parse(raw));
+  const discovery = profile.sources.find((source) => source.sourceId === "cn-google-news-ai");
+  const selfHosted = profile.sources.find((source) => source.sourceId === "cn-rsshub-self-hosted");
+
+  assert.ok(discovery);
+  assert.equal(discovery.enabled, true);
+  assert.equal(discovery.kind, "rss");
+  assert.match(String(discovery.url), /^https:\/\/news\.google\.com\/rss\/search\?/);
+  assert.ok(selfHosted);
+  assert.equal(selfHosted.enabled, false);
+  assert.equal(selfHosted.kind, "rsshub-compatible");
+  assert.match(String(selfHosted.url), /your-rsshub\.example/);
+  assert.equal(/api.?key|authorization|credential|password|token/i.test(raw), false);
+});

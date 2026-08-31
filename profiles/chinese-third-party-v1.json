@@ -1,0 +1,29 @@
+{
+  "profileId": "chinese-third-party-v1",
+  "version": "v1",
+  "outputDirectory": "Trending Radar",
+  "sources": [
+    {
+      "sourceId": "cn-google-news-ai",
+      "label": "Google News 聚合：AI / 大模型 / Agent",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://news.google.com/rss/search?q=%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD+OR+%E5%A4%A7%E6%A8%A1%E5%9E%8B+OR+%22AI+Agent%22&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+      "limit": 20
+    },
+    {
+      "sourceId": "cn-rsshub-self-hosted",
+      "label": "自托管 RSSHub 路由（替换 URL 后启用）",
+      "kind": "rsshub-compatible",
+      "enabled": false,
+      "url": "https://your-rsshub.example/route",
+      "limit": 20
+    }
+  ],
+  "topics": ["AI", "Agent", "MCP", "大模型", "开发工具", "开源", "产品"],
+  "filter": {
+    "maxItems": 50,
+    "requireTopicMatch": false
+  },
+  "templateId": "default"
+}
