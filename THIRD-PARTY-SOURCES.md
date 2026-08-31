@@ -1,7 +1,8 @@
 # Third-party source profile
 
 `profiles/chinese-third-party-v1.json` is an opt-in extension profile. It is separate from the
-stable direct-feed packs and is not used by `npm run smoke:cn`.
+stable direct-feed packs and is not used by `npm run smoke:cn`. Run `npm run smoke:third-party` to
+verify the enabled discovery feed and see disabled templates explicitly skipped.
 
 ## Included sources
 
@@ -19,5 +20,14 @@ when discovery breadth is more valuable than source authority. Keep failures vis
 the provider route periodically; a successful HTTP response does not prove that the upstream
 website remains complete or accurate.
 
-The Google News endpoint was probed on 2026-08-31 and returned HTTP 200 with `application/xml`.
-This is time-specific network evidence, not a guarantee of future availability or ranking quality.
+The Google News endpoint was probed on 2026-08-31 and returned HTTP 200 with `application/xml`;
+`npm run smoke:third-party` is the repeatable check. This is time-specific network evidence, not a
+guarantee of future availability or ranking quality.
+
+Latest smoke (`2026-08-31`):
+
+```text
+cn-rsshub-self-hosted: skipped enabled=false kind=rsshub-compatible
+cn-google-news-ai: ok items=20 dropped=0 latest=2026-08-31T04:14:58.000Z fresh=true
+summary: healthy=1/1 required=1 skipped=1 maxAgeDays=14
+```
