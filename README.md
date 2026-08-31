@@ -30,12 +30,11 @@ For optional third-party discovery, use `profiles/chinese-third-party-v1.json` a
 disabled self-hosted RSSHub template. This profile is intentionally separate from the default
 direct-feed baseline and is not included in the Chinese source smoke.
 
-For broader coverage, use the separate `profiles/global-tech-v1.json` and
-`profiles/research-signals-v1.json` profiles. The global profile adds SegmentFault, Lobsters,
-OpenAI Blog, TechCrunch, The Verge, and Ars Technica; the research profile adds arXiv `cs.AI` and
-`cs.LG`. Run `npm run smoke:global` and `npm run smoke:research` independently. Keep these profiles
-separate from the Chinese baseline because global media and paper feeds have different noise and
-freshness characteristics.
+For the intended broad daily report, use `profiles/broad-trending-v1.json`. It combines the Chinese,
+global, research, GitHub, Hacker News, and discovery sources into one run and one candidate pool.
+Topic scoring selects up to 50 items with a four-item per-source cap, then renders four report
+Sections: 开源与开发、AI 前沿、产品与产业、媒体与发现. The smaller Chinese, third-party, global,
+and research profiles remain useful as independently smokeable source packs.
 
 Development follows the official Obsidian sample plugin shape:
 
@@ -48,6 +47,7 @@ npm run smoke:cn
 npm run smoke:third-party
 npm run smoke:global
 npm run smoke:research
+npm run smoke:broad
 ```
 
 ## Repository boundary

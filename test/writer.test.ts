@@ -27,6 +27,55 @@ test("requireTopicMatch excludes non-matching items and puts null dates last", (
   assert.equal(selected.selection.candidateCount, 3);
 });
 
+test("sectioned selection keeps one candidate pool while enforcing section and source caps", () => {
+  const selected = selectTrendItems([
+    item("oss-a", "AI one", "2026-08-29T04:00:00Z"),
+    item("oss-a", "AI two", "2026-08-29T03:00:00Z"),
+    item("oss-a", "AI three", "2026-08-29T02:00:00Z"),
+    item("oss-b", "AI four", "2026-08-29T01:00:00Z"),
+    item("media-a", "AI product", "2026-08-29T05:00:00Z")
+  ], ["AI"], {
+    maxItems: 5,
+    maxItemsPerSource: 2,
+    sections: [
+      { sectionId: "open-source", label: "开源观察", sourceIds: ["oss-a", "oss-b"], maxItems: 3 },
+      { sectionId: "media", label: "媒体资讯", sourceIds: ["media-a"], maxItems: 2 }
+    ]
+  });
+
+  assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["oss-a", "oss-a", "oss-b", "media-a"]);
+  assert.equal(selected.selection.maxItemsPerSource, 2);
+  assert.deepEqual(selected.selection.sections?.map((section) => [section.sectionId, section.selectedCount]), [["open-source", 3], ["media", 1]]);
+});
+
+test("sectioned template renders one report with multiple blocks", () => {
+  const input = createDraftInput({
+    runId: "run-sectioned",
+    profileId: "broad",
+    profileVersion: "v1",
+    status: "completed",
+    generatedAt: "2026-08-29T00:10:00Z",
+    templateId: "sectioned-v1",
+    topics: ["AI"],
+    filter: {
+      maxItems: 4,
+      sections: [
+        { sectionId: "open-source", label: "开源观察", sourceIds: ["oss"], maxItems: 2 },
+        { sectionId: "media", label: "媒体资讯", sourceIds: ["media"], maxItems: 2 }
+      ]
+    },
+    items: [item("oss", "AI repository", "2026-08-29T00:00:00Z"), item("media", "AI launch", "2026-08-29T01:00:00Z")],
+    failures: []
+  });
+  const output = renderTemplateDraft(input);
+  assert.match(output.markdown, /### 开源观察 \(1\/2\)/);
+  assert.match(output.markdown, /### 媒体资讯 \(1\/2\)/);
+  assert.match(output.markdown, /#### 1\. AI repository/);
+  assert.match(output.markdown, /#### 2\. AI launch/);
+  assert.equal(validateExternalWriterOutput(input, output).ok, true);
+  assert.equal(validateExternalWriterOutput(input, { ...output, markdown: output.markdown.replace("媒体资讯", "其他") }).ok, false);
+});
+
 test("template draft always exposes status and failures, including an empty selection", () => {
   const input = createDraftInput({ runId: "run-1", profileId: "default", profileVersion: "v1", status: "partial", generatedAt: "2026-08-29T00:10:00Z", templateId: "default", topics: ["software"], filter: { maxItems: 1 }, items: [], failures: [failure] });
   const output = renderTemplateDraft(input);

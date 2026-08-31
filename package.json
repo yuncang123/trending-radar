@@ -12,7 +12,8 @@
     "smoke:cn": "npm run build:test && node scripts/smoke-chinese-sources.mjs",
     "smoke:third-party": "npm run build:test && node scripts/smoke-third-party-sources.mjs",
     "smoke:global": "npm run build:test && node scripts/smoke-profile.mjs profiles/global-tech-v1.json 5",
-    "smoke:research": "npm run build:test && node scripts/smoke-profile.mjs profiles/research-signals-v1.json 2"
+    "smoke:research": "npm run build:test && node scripts/smoke-profile.mjs profiles/research-signals-v1.json 2",
+    "smoke:broad": "npm run build:test && node scripts/smoke-broad-profile.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.17",

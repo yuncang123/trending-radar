@@ -30,3 +30,23 @@ test("rejects path traversal in source IDs and output directories", () => {
   assert.throws(() => parseProfile({ ...valid, sources: [{ sourceId: "../escape", kind: "rss", enabled: true }] }), /safe stable identifier/);
   assert.throws(() => parseProfile({ ...valid, outputDirectory: "../outside" }), /inside the vault/);
 });
+
+test("validates deterministic section and per-source selection settings", () => {
+  const sectioned = parseProfile({
+    ...valid,
+    filter: {
+      maxItems: 10,
+      maxItemsPerSource: 2,
+      sections: [{ sectionId: "open-source", label: "开源观察", maxItems: 5, sourceIds: ["rss-a"] }]
+    }
+  });
+  assert.equal(sectioned.filter.maxItemsPerSource, 2);
+  assert.throws(() => parseProfile({ ...valid, filter: { sections: "invalid" } }), /filter.sections must be an array/);
+  assert.throws(() => parseProfile({
+    ...valid,
+    filter: { sections: [
+      { sectionId: "a", label: "A", maxItems: 1, sourceIds: ["rss-a"] },
+      { sectionId: "b", label: "B", maxItems: 1, sourceIds: ["rss-a"] }
+    ] }
+  }), /assigned to multiple sections/);
+});

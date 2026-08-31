@@ -6,6 +6,11 @@
 
 `schemaVersion`, `runId`, `profileId`, `profileVersion`, `status`, `generatedAt`, `templateId`, `topics`, `selection`, `items`, `failures`.
 
+`selection.sections`, when present, is an additive grouping extension. Each entry provides a stable
+`sectionId`, display `label`, member `sourceIds`, `maxItems`, and `selectedCount`. `items[]` remains
+one flat, read-only fact collection ordered by Section; consume the declared counts in order or
+group by `sourceId`. Preserve every declared Section label in the report.
+
 `items[]` contains normalized source items and their `verification` objects. `failures[]` contains at least `sourceId`, `stage`, `code`, `message`, `retryable`, and `retrievedAt`.
 
 ## Output

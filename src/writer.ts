@@ -1,4 +1,4 @@
-import type { DraftInput, NormalizedItem, SourceFailure, WriterOutput } from "./types.js";
+import type { DraftInput, DraftSectionSelection, NormalizedItem, SourceFailure, WriterOutput } from "./types.js";
 
 const DEFAULT_MAX_ITEMS = 50;
 
@@ -9,6 +9,26 @@ function filterNumber(filter: Record<string, unknown>, key: string, fallback: nu
 
 function requireTopicMatch(filter: Record<string, unknown>): boolean {
   return filter.requireTopicMatch === true;
+}
+
+interface SectionConfig {
+  sectionId: string;
+  label: string;
+  sourceIds: string[];
+  maxItems: number;
+}
+
+function sectionConfigs(filter: Record<string, unknown>): SectionConfig[] {
+  if (!Array.isArray(filter.sections)) return [];
+  return filter.sections.flatMap((value) => {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return [];
+    const section = value as Record<string, unknown>;
+    if (typeof section.sectionId !== "string" || typeof section.label !== "string" || !Array.isArray(section.sourceIds)) return [];
+    const sourceIds = section.sourceIds.filter((sourceId): sourceId is string => typeof sourceId === "string");
+    const maxItems = Number(section.maxItems);
+    if (sourceIds.length === 0 || !Number.isInteger(maxItems) || maxItems <= 0) return [];
+    return [{ sectionId: section.sectionId, label: section.label, sourceIds, maxItems }];
+  });
 }
 
 function topicScore(item: NormalizedItem, topics: string[]): number {
@@ -43,8 +63,79 @@ export function selectTrendItems(items: NormalizedItem[], topics: string[], filt
   const maxItems = filterNumber(filter, "maxItems", DEFAULT_MAX_ITEMS);
   const mustMatch = requireTopicMatch(filter);
   const candidates = mustMatch && topics.length > 0 ? items.filter((item) => topicScore(item, topics) > 0) : items;
-  const selected = [...candidates].sort((a, b) => compareItems(a, b, topics)).slice(0, maxItems);
-  return { items: selected, selection: { candidateCount: items.length, selectedCount: selected.length, maxItems, requireTopicMatch: mustMatch } };
+  const ranked = [...candidates].sort((a, b) => compareItems(a, b, topics));
+  const configuredMaxPerSource = filter.maxItemsPerSource;
+  const maxItemsPerSource = typeof configuredMaxPerSource === "number" && Number.isInteger(configuredMaxPerSource) && configuredMaxPerSource > 0
+    ? configuredMaxPerSource
+    : undefined;
+  const sections = sectionConfigs(filter);
+
+  if (sections.length === 0 && maxItemsPerSource === undefined) {
+    const selected = ranked.slice(0, maxItems);
+    return { items: selected, selection: { candidateCount: items.length, selectedCount: selected.length, maxItems, requireTopicMatch: mustMatch } };
+  }
+
+  const selected: NormalizedItem[] = [];
+  const selectedItems = new Set<NormalizedItem>();
+  const sourceCounts = new Map<string, number>();
+  const canSelect = (item: NormalizedItem): boolean => !selectedItems.has(item)
+    && (maxItemsPerSource === undefined || (sourceCounts.get(item.sourceId) ?? 0) < maxItemsPerSource);
+  const addItem = (item: NormalizedItem): void => {
+    selected.push(item);
+    selectedItems.add(item);
+    sourceCounts.set(item.sourceId, (sourceCounts.get(item.sourceId) ?? 0) + 1);
+  };
+
+  if (sections.length === 0) {
+    for (const item of ranked) {
+      if (selected.length >= maxItems) break;
+      if (canSelect(item)) addItem(item);
+    }
+    return {
+      items: selected,
+      selection: { candidateCount: items.length, selectedCount: selected.length, maxItems, requireTopicMatch: mustMatch, maxItemsPerSource }
+    };
+  }
+
+  const sectionSelections: DraftSectionSelection[] = [];
+  const assignedSources = new Set(sections.flatMap((section) => section.sourceIds));
+  for (const section of sections) {
+    const sourceIds = new Set(section.sourceIds);
+    const start = selected.length;
+    for (const item of ranked) {
+      if (selected.length >= maxItems || selected.length - start >= section.maxItems) break;
+      if (sourceIds.has(item.sourceId) && canSelect(item)) addItem(item);
+    }
+    sectionSelections.push({ ...section, selectedCount: selected.length - start });
+  }
+
+  const unassigned = ranked.filter((item) => !assignedSources.has(item.sourceId));
+  if (unassigned.length > 0 && selected.length < maxItems) {
+    const start = selected.length;
+    for (const item of unassigned) {
+      if (selected.length >= maxItems) break;
+      if (canSelect(item)) addItem(item);
+    }
+    sectionSelections.push({
+      sectionId: "other",
+      label: "Other",
+      sourceIds: [...new Set(unassigned.map((item) => item.sourceId))].sort(compareText),
+      maxItems: maxItems - start,
+      selectedCount: selected.length - start
+    });
+  }
+
+  return {
+    items: selected,
+    selection: {
+      candidateCount: items.length,
+      selectedCount: selected.length,
+      maxItems,
+      requireTopicMatch: mustMatch,
+      ...(maxItemsPerSource === undefined ? {} : { maxItemsPerSource }),
+      sections: sectionSelections
+    }
+  };
 }
 
 export function createDraftInput(args: {
@@ -74,11 +165,11 @@ function failureLine(failure: SourceFailure): string {
     `\`${safeText(failure.code)}\`): ${safeText(failure.message)}; ${retry}${fallback}`;
 }
 
-function itemBlock(item: NormalizedItem, index: number): string {
+function itemBlock(item: NormalizedItem, index: number, headingLevel = 3): string {
   const published = item.publishedAt ? safeText(item.publishedAt) : "unknown";
   const verification = `reachable=${item.verification.reachable}; status=${item.verification.status ?? "unknown"}; checked=${safeText(item.verification.checkedAt)}`;
   return [
-    `### ${index}. ${safeText(item.title)}`,
+    `${"#".repeat(headingLevel)} ${index}. ${safeText(item.title)}`,
     `- Link: <${item.url}>`,
     `- Source: \`${safeText(item.sourceId)}\``,
     `- Published: ${published}`,
@@ -88,11 +179,36 @@ function itemBlock(item: NormalizedItem, index: number): string {
   ].join("\n");
 }
 
+function renderSelectedItems(input: DraftInput): string {
+  const sections = input.selection.sections;
+  if (!sections || sections.length === 0) {
+    return input.items.length > 0
+      ? input.items.map((item, index) => itemBlock(item, index + 1)).join("\n")
+      : "No usable items were selected. Check source failures, topics, and filter settings.\n";
+  }
+
+  let offset = 0;
+  let itemIndex = 1;
+  const blocks = sections.map((section) => {
+    const sectionItems = input.items.slice(offset, offset + section.selectedCount);
+    offset += section.selectedCount;
+    const body = sectionItems.length > 0
+      ? sectionItems.map((item) => itemBlock(item, itemIndex++, 4)).join("\n")
+      : "- No items selected.\n";
+    return [`### ${safeText(section.label)} (${section.selectedCount}/${section.maxItems})`, "", body].join("\n");
+  });
+  if (offset < input.items.length) {
+    const remaining = input.items.slice(offset);
+    blocks.push(["### Other", "", remaining.map((item) => itemBlock(item, itemIndex++, 4)).join("\n")].join("\n"));
+  }
+  return blocks.join("\n");
+}
+
 export function renderTemplateDraft(input: DraftInput): WriterOutput {
   const date = input.generatedAt.slice(0, 10);
   const title = `Trending Radar ${date}`;
   const failures = input.failures.length > 0 ? input.failures.map(failureLine).join("\n") : "- None";
-  const items = input.items.length > 0 ? input.items.map(itemBlock).join("\n") : "No usable items were selected. Check source failures, topics, and filter settings.\n";
+  const items = renderSelectedItems(input);
   const markdown = [
     `# ${title}`,
     "",
@@ -122,6 +238,7 @@ export function appendFactAppendix(input: DraftInput, markdown: string): string 
     `- Profile: ${input.profileId} / ${input.profileVersion}`,
     `- Candidates: ${input.selection.candidateCount}; selected: ${input.selection.selectedCount}`,
     `- Topics: ${input.topics.length > 0 ? input.topics.map(safeText).join(", ") : "none"}`,
+    ...(input.selection.sections ?? []).map((section) => `- Section: ${safeText(section.sectionId)} | ${safeText(section.label)} | selected=${section.selectedCount} | max=${section.maxItems}`),
     ...input.items.map((item) => `- Item: ${safeText(item.sourceId)} | ${safeText(item.title)} | ${item.url}`),
     ...input.failures.map((failure) => `- Failure: ${safeText(failure.sourceId)} | ${safeText(failure.stage)} | ${safeText(failure.code)}`)
   ];
@@ -158,6 +275,7 @@ export function validateExternalWriterOutput(input: DraftInput, candidate: unkno
     String(input.selection.candidateCount),
     String(input.selection.selectedCount),
     ...input.topics,
+    ...(input.selection.sections ?? []).map((section) => section.label),
     ...input.items.flatMap((item) => [item.sourceId, item.title, item.url]),
     ...input.failures.flatMap((failure) => [failure.sourceId, failure.stage, failure.code])
   ];

@@ -107,6 +107,16 @@ export interface DraftSelection {
   selectedCount: number;
   maxItems: number;
   requireTopicMatch: boolean;
+  maxItemsPerSource?: number;
+  sections?: DraftSectionSelection[];
+}
+
+export interface DraftSectionSelection {
+  sectionId: string;
+  label: string;
+  sourceIds: string[];
+  maxItems: number;
+  selectedCount: number;
 }
 
 export interface DraftInput {

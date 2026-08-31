@@ -71,3 +71,18 @@ test("research signal profile uses bounded public Atom feeds", () => {
   assert.ok(enabled.every((source) => String(source.url).startsWith("https://export.arxiv.org/api/query?")));
   assert.equal(/api.?key|authorization|credential|password|token/i.test(raw), false);
 });
+
+test("broad trending profile combines all source families into one sectioned run", () => {
+  const raw = readFileSync(resolve("profiles/broad-trending-v1.json"), "utf8");
+  const profile = parseProfile(JSON.parse(raw));
+  const enabled = profile.sources.filter((source) => source.enabled);
+  const sections = profile.filter.sections as Array<{ sourceIds: string[] }>;
+
+  assert.equal(profile.profileId, "broad-trending-v1");
+  assert.equal(enabled.length, 20);
+  assert.equal(sections.length, 4);
+  assert.equal(new Set(sections.flatMap((section) => section.sourceIds)).size, enabled.length);
+  assert.equal(profile.filter.maxItemsPerSource, 4);
+  assert.equal(profile.templateId, "sectioned-v1");
+  assert.equal(/api.?key|authorization|credential|password|token/i.test(raw), false);
+});
