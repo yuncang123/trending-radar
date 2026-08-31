@@ -18,11 +18,12 @@ Next to `Model ID`, use `Refresh` to load model IDs from the configured Provider
 
 Start from `profiles/example.json`, or create a Profile from the settings page and add custom public sources. Provider secrets do not belong in a shared Profile. Scheduling and publishing are outside this plugin.
 
-For a usable Chinese technology baseline, start from `profiles/chinese-tech-v1.json`. It enables six
-direct public RSS feeds (少数派、Solidot、InfoQ 中文、量子位、开源中国、博客园) and does not rely
-on a public RSSHub instance. Run `npm run smoke:cn` to see per-source item counts, newest publication
-time, freshness, and structured failures; the smoke passes when at least five sources have an item
-published within the last 14 days.
+For a usable Chinese technology baseline, start from `profiles/chinese-tech-v2.json`. It enables nine
+direct public RSS feeds (少数派、Solidot、InfoQ 中文、量子位、开源中国、博客园、IT之家、掘金、爱范儿)
+and does not rely on a public RSSHub instance. The earlier six-source set remains available as
+`profiles/chinese-tech-v1.json` for rollback and comparison. Run `npm run smoke:cn` to see per-source
+item counts, newest publication time, freshness, and structured failures; the v2 smoke passes when at
+least eight sources have an item published within the last 14 days.
 
 Development follows the official Obsidian sample plugin shape:
 

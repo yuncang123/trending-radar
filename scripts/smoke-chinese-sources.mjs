@@ -2,8 +2,8 @@ import { readFile } from "node:fs/promises";
 import { RssAdapter } from "../dist-test/src/adapters/rss.js";
 import { parseProfile } from "../dist-test/src/profile.js";
 
-const PROFILE_PATH = new URL("../profiles/chinese-tech-v1.json", import.meta.url);
-const MIN_HEALTHY_SOURCES = 5;
+const PROFILE_PATH = new URL("../profiles/chinese-tech-v2.json", import.meta.url);
+const MIN_HEALTHY_SOURCES = 8;
 const MAX_AGE_DAYS = 14;
 const REQUEST_TIMEOUT_MS = 20_000;
 
