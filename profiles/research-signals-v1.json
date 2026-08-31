@@ -1,0 +1,29 @@
+{
+  "profileId": "research-signals-v1",
+  "version": "v1",
+  "outputDirectory": "Trending Radar",
+  "sources": [
+    {
+      "sourceId": "research-arxiv-cs-ai",
+      "label": "arXiv cs.AI",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://export.arxiv.org/api/query?search_query=cat%3Acs.AI&start=0&max_results=10&sortBy=submittedDate&sortOrder=descending",
+      "limit": 10
+    },
+    {
+      "sourceId": "research-arxiv-cs-lg",
+      "label": "arXiv cs.LG",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://export.arxiv.org/api/query?search_query=cat%3Acs.LG&start=0&max_results=10&sortBy=submittedDate&sortOrder=descending",
+      "limit": 10
+    }
+  ],
+  "topics": ["AI", "Agent", "MCP", "large language model", "machine learning", "deep learning", "生成式 AI"],
+  "filter": {
+    "maxItems": 30,
+    "requireTopicMatch": false
+  },
+  "templateId": "default"
+}

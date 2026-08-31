@@ -10,7 +10,9 @@
     "test": "npm run build:test && node --test dist-test/test/ledger.test.js dist-test/test/profile.test.js dist-test/test/profile-editor.test.js dist-test/test/source-pack.test.js dist-test/test/normalize.test.js dist-test/test/adapters.test.js dist-test/test/run-store.test.js dist-test/test/writer.test.js dist-test/test/provider.test.js dist-test/test/i18n.test.js dist-test/test/settings-scroll.test.js",
     "smoke": "npm run build:test && node scripts/smoke.mjs",
     "smoke:cn": "npm run build:test && node scripts/smoke-chinese-sources.mjs",
-    "smoke:third-party": "npm run build:test && node scripts/smoke-third-party-sources.mjs"
+    "smoke:third-party": "npm run build:test && node scripts/smoke-third-party-sources.mjs",
+    "smoke:global": "npm run build:test && node scripts/smoke-profile.mjs profiles/global-tech-v1.json 5",
+    "smoke:research": "npm run build:test && node scripts/smoke-profile.mjs profiles/research-signals-v1.json 2"
   },
   "devDependencies": {
     "@types/node": "^22.15.17",

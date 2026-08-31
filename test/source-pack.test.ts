@@ -46,3 +46,28 @@ test("third-party source profile keeps discovery and self-hosted routes opt-in",
   assert.match(String(selfHosted.url), /your-rsshub\.example/);
   assert.equal(/api.?key|authorization|credential|password|token/i.test(raw), false);
 });
+
+test("global technology profile covers Chinese developers and global technology feeds", () => {
+  const raw = readFileSync(resolve("profiles/global-tech-v1.json"), "utf8");
+  const profile = parseProfile(JSON.parse(raw));
+  const enabled = profile.sources.filter((source) => source.enabled);
+
+  assert.equal(profile.profileId, "global-tech-v1");
+  assert.equal(enabled.length, 6);
+  assert.ok(enabled.every((source) => source.kind === "rss"));
+  assert.ok(enabled.every((source) => new URL(String(source.url)).protocol === "https:"));
+  assert.equal(new Set(enabled.map((source) => source.sourceId)).size, enabled.length);
+  assert.equal(/api.?key|authorization|credential|password|token/i.test(raw), false);
+});
+
+test("research signal profile uses bounded public Atom feeds", () => {
+  const raw = readFileSync(resolve("profiles/research-signals-v1.json"), "utf8");
+  const profile = parseProfile(JSON.parse(raw));
+  const enabled = profile.sources.filter((source) => source.enabled);
+
+  assert.equal(profile.profileId, "research-signals-v1");
+  assert.equal(enabled.length, 2);
+  assert.ok(enabled.every((source) => source.kind === "rss" && source.limit === 10));
+  assert.ok(enabled.every((source) => String(source.url).startsWith("https://export.arxiv.org/api/query?")));
+  assert.equal(/api.?key|authorization|credential|password|token/i.test(raw), false);
+});

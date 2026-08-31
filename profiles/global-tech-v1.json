@@ -1,0 +1,61 @@
+{
+  "profileId": "global-tech-v1",
+  "version": "v1",
+  "outputDirectory": "Trending Radar",
+  "sources": [
+    {
+      "sourceId": "cn-segmentfault",
+      "label": "SegmentFault 思否",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://segmentfault.com/feeds",
+      "limit": 10
+    },
+    {
+      "sourceId": "global-lobsters",
+      "label": "Lobsters",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://lobste.rs/rss",
+      "limit": 10
+    },
+    {
+      "sourceId": "global-openai-blog",
+      "label": "OpenAI Blog",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://openai.com/blog/rss.xml",
+      "limit": 10
+    },
+    {
+      "sourceId": "global-techcrunch",
+      "label": "TechCrunch",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://techcrunch.com/feed/",
+      "limit": 10
+    },
+    {
+      "sourceId": "global-verge",
+      "label": "The Verge",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://www.theverge.com/rss/index.xml",
+      "limit": 10
+    },
+    {
+      "sourceId": "global-ars",
+      "label": "Ars Technica",
+      "kind": "rss",
+      "enabled": true,
+      "url": "https://feeds.arstechnica.com/arstechnica/index",
+      "limit": 10
+    }
+  ],
+  "topics": ["AI", "Agent", "MCP", "large language model", "developer tools", "open source", "software", "product"],
+  "filter": {
+    "maxItems": 50,
+    "requireTopicMatch": false
+  },
+  "templateId": "default"
+}
