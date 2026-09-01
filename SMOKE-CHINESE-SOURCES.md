@@ -1,8 +1,32 @@
-# Chinese Source Pack v1 smoke evidence
+# Chinese Source Pack smoke evidence
 
-Date: 2026-08-30
+Date: 2026-09-01
 
-## Direct source health
+## Chinese Source Pack v2 direct source health
+
+Command: `npm run smoke:cn`
+
+```text
+cn-sspai: ok items=10 fresh=true
+cn-solidot: ok items=10 fresh=true
+cn-infoq: ok items=10 fresh=true
+cn-qbitai: ok items=10 fresh=true
+cn-oschina: ok items=10 fresh=true
+cn-cnblogs: ok items=10 fresh=true
+cn-ithome: ok items=10 fresh=true
+cn-meituan-tech: ok items=10 latest=unknown fresh=false
+cn-ruanyifeng-weekly: ok items=3 fresh=true
+cn-ifanr: ok items=10 fresh=true
+summary: healthy=9/10 required=8 maxAgeDays=14
+```
+
+All ten direct feeds were reachable and parseable. 美团技术团队 does not expose per-item
+publication dates in its feed, so it cannot satisfy the date-based freshness metric even though ten
+items were collected. The broken Juejin endpoint is no longer part of v2. Public RSSHub is not used.
+
+## Chinese Source Pack v1 rollback baseline
+
+### Direct source health
 
 Command: `npm run smoke:cn`
 
@@ -20,7 +44,7 @@ This is time-specific network evidence. The smoke fails when fewer than five sou
 least one item published within the last 14 days; every source still prints its own structured
 failure instead of disappearing from the result.
 
-## Obsidian end-to-end smoke
+### Obsidian end-to-end smoke
 
 - Isolated Vault: `<isolated-vault>`.
 - Profile: `chinese-tech-v1` / `v1`.
@@ -34,7 +58,7 @@ The selected set contained items from all six sources. Source counts were uneven
 existing deterministic topic/date ordering has no per-source diversity quota; that is a separate
 quality decision, not hidden by this source-health result.
 
-## Prior-art verdict
+### Prior-art verdict
 
 Reuse the existing `RssAdapter` and `rss-parser` for direct public feeds. Public RSSHub remains an
 optional user-configured extension, not a core dependency. Zhihu, 36Kr, Bilibili, and V2EX are not

@@ -11,6 +11,8 @@ interface GitHubRepository {
   owner?: { login?: string };
 }
 
+const SORTS = new Set(["stars", "forks", "help-wanted-issues", "updated"]);
+
 export class GitHubAdapter implements SourceAdapter {
   readonly kind = "github" as const;
   readonly adapterVersion = "v1";
@@ -19,6 +21,8 @@ export class GitHubAdapter implements SourceAdapter {
   async fetch(source: SourceConfig, context: FetchContext): Promise<SourceBatch | SourceFailure> {
     const query = typeof source.query === "string" ? source.query.trim() : "";
     if (!query) return failure(source.sourceId, "verify", "MISSING_QUERY", "GitHub source.query is required.", false, context.now());
+    const sort = typeof source.sort === "string" && SORTS.has(source.sort) ? source.sort : "updated";
+    const order = source.order === "asc" ? "asc" : "desc";
     const pages = Math.min(Math.max(Number(source.pages) || 1, 1), 3);
     const perPage = Math.min(Math.max(Number(source.limit) || 30, 1), 100);
     const retrievedAt = context.now();
@@ -27,7 +31,7 @@ export class GitHubAdapter implements SourceAdapter {
       for (let page = 1; page <= pages; page += 1) {
         const cancelledNow = cancelled(source.sourceId, context);
         if (cancelledNow) return cancelledNow;
-        const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${perPage}&page=${page}`;
+        const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=${sort}&order=${order}&per_page=${perPage}&page=${page}`;
         const response = await context.request(url, { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" });
         const statusFailure = httpFailure(source.sourceId, response, context.now());
         if (statusFailure) return statusFailure;

@@ -107,6 +107,7 @@ export interface DraftSelection {
   selectedCount: number;
   maxItems: number;
   requireTopicMatch: boolean;
+  /** Legacy compatibility field; current selection is global and does not emit source caps. */
   maxItemsPerSource?: number;
   sections?: DraftSectionSelection[];
 }
@@ -117,6 +118,8 @@ export interface DraftSectionSelection {
   sourceIds: string[];
   maxItems: number;
   selectedCount: number;
+  keywords?: string[];
+  excludeKeywords?: string[];
 }
 
 export interface DraftInput {

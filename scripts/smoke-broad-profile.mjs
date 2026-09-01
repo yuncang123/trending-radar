@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { parseHTML } from "linkedom";
 import { createAdapterRegistry } from "../dist-test/src/adapters/index.js";
-import { deduplicateItems } from "../dist-test/src/normalize.js";
+import { deduplicateItems, isLowQualityExcerpt } from "../dist-test/src/normalize.js";
 import { parseProfile } from "../dist-test/src/profile.js";
 import { createDraftInput, renderTemplateDraft } from "../dist-test/src/writer.js";
 
@@ -63,9 +63,13 @@ const sections = input.selection.sections ?? [];
 const missingHeadings = sections.filter((section) => !output.markdown.includes(`### ${section.label}`));
 
 process.stdout.write(`selection: candidates=${input.selection.candidateCount} selected=${input.selection.selectedCount} perSource=${input.selection.maxItemsPerSource ?? "none"}\n`);
+const selectedLowQuality = input.items.filter((item) => isLowQualityExcerpt(item.excerpt)).length;
+const selectedFuture = input.items.filter((item) => item.publishedAt && Date.parse(item.publishedAt) > Date.parse(input.generatedAt) + 5 * 60_000).length;
+const selectedTopicless = input.items.filter((item) => !profile.topics.some((topic) => `${item.title} ${item.excerpt}`.toLowerCase().includes(topic.toLowerCase()))).length;
+process.stdout.write(`quality: selectedLowQuality=${selectedLowQuality} selectedFuturePublishedAt=${selectedFuture} selectedTopicless=${selectedTopicless}\n`);
 for (const section of sections) {
-  process.stdout.write(`section: ${section.sectionId} selected=${section.selectedCount}/${section.maxItems}\n`);
+  process.stdout.write(`section: ${section.sectionId} selected=${section.selectedCount}\n`);
 }
-process.stdout.write(`summary: healthy=${healthy}/${profile.sources.length} required=17 sections=${sections.length}/4 missingHeadings=${missingHeadings.length}\n`);
+process.stdout.write(`summary: healthy=${healthy}/${profile.sources.length} required=17 sections=${sections.length} (configured=4, other=optional) missingHeadings=${missingHeadings.length}\n`);
 
-if (healthy < 17 || sections.length !== 4 || missingHeadings.length > 0 || input.selection.selectedCount === 0) process.exitCode = 1;
+if (healthy < 17 || sections.length < 4 || missingHeadings.length > 0 || input.selection.selectedCount === 0) process.exitCode = 1;

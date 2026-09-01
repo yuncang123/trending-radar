@@ -1,3 +1,4 @@
+import { isLowQualityExcerpt } from "./normalize.js";
 import type { DraftInput, DraftSectionSelection, NormalizedItem, SourceFailure, WriterOutput } from "./types.js";
 
 const DEFAULT_MAX_ITEMS = 50;
@@ -16,6 +17,8 @@ interface SectionConfig {
   label: string;
   sourceIds: string[];
   maxItems: number;
+  keywords?: string[];
+  excludeKeywords?: string[];
 }
 
 function sectionConfigs(filter: Record<string, unknown>): SectionConfig[] {
@@ -27,30 +30,71 @@ function sectionConfigs(filter: Record<string, unknown>): SectionConfig[] {
     const sourceIds = section.sourceIds.filter((sourceId): sourceId is string => typeof sourceId === "string");
     const maxItems = Number(section.maxItems);
     if (sourceIds.length === 0 || !Number.isInteger(maxItems) || maxItems <= 0) return [];
-    return [{ sectionId: section.sectionId, label: section.label, sourceIds, maxItems }];
+    const keywords = Array.isArray(section.keywords) ? section.keywords.filter((value): value is string => typeof value === "string" && value.trim() !== "").map((value) => value.toLowerCase()) : undefined;
+    const excludeKeywords = Array.isArray(section.excludeKeywords) ? section.excludeKeywords.filter((value): value is string => typeof value === "string" && value.trim() !== "").map((value) => value.toLowerCase()) : undefined;
+    return [{ sectionId: section.sectionId, label: section.label, sourceIds, maxItems, ...(keywords?.length ? { keywords } : {}), ...(excludeKeywords?.length ? { excludeKeywords } : {}) }];
   });
+}
+
+function itemText(item: NormalizedItem): string {
+  return `${item.title} ${item.excerpt}`.toLowerCase();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function textIncludesKeyword(text: string, keyword: string): boolean {
+  const normalized = keyword.trim().toLowerCase();
+  if (!normalized) return false;
+  const startsWithAsciiWord = /^[a-z0-9]/.test(normalized);
+  const endsWithAsciiWord = /[a-z0-9]$/.test(normalized);
+  if (!startsWithAsciiWord && !endsWithAsciiWord) return text.includes(normalized);
+  const prefix = startsWithAsciiWord ? "(?:^|[^a-z0-9])" : "";
+  const suffix = endsWithAsciiWord ? "(?![a-z0-9])" : "";
+  return new RegExp(`${prefix}${escapeRegExp(normalized)}${suffix}`).test(text);
 }
 
 function topicScore(item: NormalizedItem, topics: string[]): number {
   if (topics.length === 0) return 0;
-  const haystack = `${item.title} ${item.excerpt} ${item.sourceId}`.toLowerCase();
-  return topics.reduce((score, topic) => score + (haystack.includes(topic.toLowerCase()) ? 1 : 0), 0);
+  const haystack = itemText(item);
+  return topics.reduce((score, topic) => score + (textIncludesKeyword(haystack, topic) ? 1 : 0), 0);
+}
+
+function containsKeyword(item: NormalizedItem, keywords: string[] | undefined): boolean {
+  const text = itemText(item);
+  return Boolean(keywords?.some((keyword) => textIncludesKeyword(text, keyword)));
+}
+
+function matchesSection(item: NormalizedItem, section: SectionConfig): boolean {
+  if (!section.sourceIds.includes(item.sourceId)) return false;
+  if (containsKeyword(item, section.excludeKeywords)) return false;
+  if (section.keywords?.length) return containsKeyword(item, section.keywords);
+  return true;
+}
+
+function matchesSelectedSection(item: NormalizedItem, section: DraftSectionSelection): boolean {
+  if (!section.sourceIds.includes(item.sourceId)) return false;
+  if (containsKeyword(item, section.excludeKeywords)) return false;
+  if (section.keywords?.length) return containsKeyword(item, section.keywords);
+  return true;
 }
 
 function compareText(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-function publishedTime(value: string | null): number {
+function publishedTime(value: string | null, nowMs: number): number {
   if (!value) return Number.NEGATIVE_INFINITY;
   const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+  if (!Number.isFinite(parsed) || parsed > nowMs + 5 * 60_000) return Number.NEGATIVE_INFINITY;
+  return parsed;
 }
 
-function compareItems(a: NormalizedItem, b: NormalizedItem, topics: string[]): number {
+function compareItems(a: NormalizedItem, b: NormalizedItem, topics: string[], nowMs: number): number {
   const scoreDelta = topicScore(b, topics) - topicScore(a, topics);
   if (scoreDelta !== 0) return scoreDelta;
-  const dateDelta = publishedTime(b.publishedAt) - publishedTime(a.publishedAt);
+  const dateDelta = publishedTime(b.publishedAt, nowMs) - publishedTime(a.publishedAt, nowMs);
   if (dateDelta !== 0) return dateDelta;
   const sourceDelta = compareText(a.sourceId, b.sourceId);
   if (sourceDelta !== 0) return sourceDelta;
@@ -62,66 +106,41 @@ function compareItems(a: NormalizedItem, b: NormalizedItem, topics: string[]): n
 export function selectTrendItems(items: NormalizedItem[], topics: string[], filter: Record<string, unknown>): { items: NormalizedItem[]; selection: DraftInput["selection"] } {
   const maxItems = filterNumber(filter, "maxItems", DEFAULT_MAX_ITEMS);
   const mustMatch = requireTopicMatch(filter);
-  const candidates = mustMatch && topics.length > 0 ? items.filter((item) => topicScore(item, topics) > 0) : items;
-  const ranked = [...candidates].sort((a, b) => compareItems(a, b, topics));
-  const configuredMaxPerSource = filter.maxItemsPerSource;
-  const maxItemsPerSource = typeof configuredMaxPerSource === "number" && Number.isInteger(configuredMaxPerSource) && configuredMaxPerSource > 0
-    ? configuredMaxPerSource
-    : undefined;
+  const retrievedTimes = items.map((item) => Date.parse(item.retrievedAt)).filter((value) => Number.isFinite(value));
+  const nowMs = retrievedTimes.length > 0 ? Math.max(...retrievedTimes) : Date.now();
+  const excludedKeywords = Array.isArray(filter.excludeKeywords) ? filter.excludeKeywords.filter((value): value is string => typeof value === "string" && value.trim() !== "").map((value) => value.toLowerCase()) : [];
+  const qualityFiltered = items.filter((item) => filter.excludeLowQuality !== true || !isLowQualityExcerpt(item.excerpt));
+  const dateFiltered = qualityFiltered.filter((item) => filter.rejectFuturePublishedAt !== true || publishedTime(item.publishedAt, nowMs) !== Number.NEGATIVE_INFINITY || !item.publishedAt);
+  const topicFiltered = mustMatch && topics.length > 0 ? dateFiltered.filter((item) => topicScore(item, topics) > 0) : dateFiltered;
+  const candidates = topicFiltered.filter((item) => !excludedKeywords.some((keyword) => textIncludesKeyword(itemText(item), keyword)));
+  const ranked = [...candidates].sort((a, b) => compareItems(a, b, topics, nowMs));
   const sections = sectionConfigs(filter);
-
-  if (sections.length === 0 && maxItemsPerSource === undefined) {
-    const selected = ranked.slice(0, maxItems);
+  // Relevance is decided globally. Sections only organize the already selected
+  // trends; their order, caps, exploration, and backfill flags never displace
+  // a higher-ranked item from another section.
+  const selected = ranked.slice(0, maxItems);
+  if (sections.length === 0) {
     return { items: selected, selection: { candidateCount: items.length, selectedCount: selected.length, maxItems, requireTopicMatch: mustMatch } };
   }
 
-  const selected: NormalizedItem[] = [];
-  const selectedItems = new Set<NormalizedItem>();
-  const sourceCounts = new Map<string, number>();
-  const canSelect = (item: NormalizedItem): boolean => !selectedItems.has(item)
-    && (maxItemsPerSource === undefined || (sourceCounts.get(item.sourceId) ?? 0) < maxItemsPerSource);
-  const addItem = (item: NormalizedItem): void => {
-    selected.push(item);
-    selectedItems.add(item);
-    sourceCounts.set(item.sourceId, (sourceCounts.get(item.sourceId) ?? 0) + 1);
-  };
-
-  if (sections.length === 0) {
-    for (const item of ranked) {
-      if (selected.length >= maxItems) break;
-      if (canSelect(item)) addItem(item);
-    }
-    return {
-      items: selected,
-      selection: { candidateCount: items.length, selectedCount: selected.length, maxItems, requireTopicMatch: mustMatch, maxItemsPerSource }
-    };
-  }
-
-  const sectionSelections: DraftSectionSelection[] = [];
-  const assignedSources = new Set(sections.flatMap((section) => section.sourceIds));
-  for (const section of sections) {
-    const sourceIds = new Set(section.sourceIds);
-    const start = selected.length;
-    for (const item of ranked) {
-      if (selected.length >= maxItems || selected.length - start >= section.maxItems) break;
-      if (sourceIds.has(item.sourceId) && canSelect(item)) addItem(item);
-    }
-    sectionSelections.push({ ...section, selectedCount: selected.length - start });
-  }
-
-  const unassigned = ranked.filter((item) => !assignedSources.has(item.sourceId));
-  if (unassigned.length > 0 && selected.length < maxItems) {
-    const start = selected.length;
-    for (const item of unassigned) {
-      if (selected.length >= maxItems) break;
-      if (canSelect(item)) addItem(item);
-    }
+  const sectionSelections: DraftSectionSelection[] = sections.map((section) => ({
+    sectionId: section.sectionId,
+    label: section.label,
+    sourceIds: section.sourceIds,
+    maxItems: section.maxItems,
+    selectedCount: selected.filter((item) => matchesSection(item, section)).length,
+    ...(section.keywords ? { keywords: section.keywords } : {}),
+    ...(section.excludeKeywords ? { excludeKeywords: section.excludeKeywords } : {})
+  }));
+  const assignedItems = new Set(selected.filter((item) => sectionSelections.some((section) => matchesSelectedSection(item, section))));
+  const unassigned = selected.filter((item) => !assignedItems.has(item));
+  if (unassigned.length > 0) {
     sectionSelections.push({
       sectionId: "other",
       label: "Other",
       sourceIds: [...new Set(unassigned.map((item) => item.sourceId))].sort(compareText),
-      maxItems: maxItems - start,
-      selectedCount: selected.length - start
+      maxItems: unassigned.length,
+      selectedCount: unassigned.length
     });
   }
 
@@ -132,7 +151,6 @@ export function selectTrendItems(items: NormalizedItem[], topics: string[], filt
       selectedCount: selected.length,
       maxItems,
       requireTopicMatch: mustMatch,
-      ...(maxItemsPerSource === undefined ? {} : { maxItemsPerSource }),
       sections: sectionSelections
     }
   };
@@ -187,18 +205,18 @@ function renderSelectedItems(input: DraftInput): string {
       : "No usable items were selected. Check source failures, topics, and filter settings.\n";
   }
 
-  let offset = 0;
   let itemIndex = 1;
+  const renderedItems = new Set<NormalizedItem>();
   const blocks = sections.map((section) => {
-    const sectionItems = input.items.slice(offset, offset + section.selectedCount);
-    offset += section.selectedCount;
+    const sectionItems = input.items.filter((item) => !renderedItems.has(item) && matchesSelectedSection(item, section));
+    sectionItems.forEach((item) => renderedItems.add(item));
     const body = sectionItems.length > 0
       ? sectionItems.map((item) => itemBlock(item, itemIndex++, 4)).join("\n")
       : "- No items selected.\n";
-    return [`### ${safeText(section.label)} (${section.selectedCount}/${section.maxItems})`, "", body].join("\n");
+    return [`### ${safeText(section.label)} (${sectionItems.length})`, "", body].join("\n");
   });
-  if (offset < input.items.length) {
-    const remaining = input.items.slice(offset);
+  if (renderedItems.size < input.items.length) {
+    const remaining = input.items.filter((item) => !renderedItems.has(item));
     blocks.push(["### Other", "", remaining.map((item) => itemBlock(item, itemIndex++, 4)).join("\n")].join("\n"));
   }
   return blocks.join("\n");

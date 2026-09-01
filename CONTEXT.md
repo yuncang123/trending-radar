@@ -15,8 +15,10 @@ independently. It does not imply a separate user-facing report.
 _Avoid_: Profile, feed
 
 **Section**:
-A deterministic partition of selected items inside one report, with its own source membership and
-item cap. All Sections share the same run, candidate pool, topics, failures, and output file.
+A deterministic presentation partition of globally selected items inside one report, with source
+membership and optional item keywords/exclusions. Section order and item caps never decide which
+trends enter the global selection. All Sections share the same run, candidate pool, topics, failures,
+and output file.
 _Avoid_: Profile, independent report
 
 **Discovery Source**:

@@ -76,13 +76,34 @@ test("GitHub adapter paginates and reports rate limits and timeouts", async () =
   assert.equal(timedOut.ok ? "" : timedOut.code, "TIMEOUT");
 });
 
-test("Hacker News adapter loads public story IDs and item records", async () => {
+test("GitHub adapter can request popularity ordering explicitly", async () => {
+  const url = "https://api.github.com/search/repositories?q=ai&sort=stars&order=desc&per_page=1&page=1";
+  const result = await new GitHubAdapter().fetch(source("github", "github", { query: "ai", limit: 1, sort: "stars" }), context({
+    [url]: response(JSON.stringify({ items: [{ id: 1, full_name: "owner/repo", html_url: "https://github.com/owner/repo", description: "demo", updated_at: "2026-08-28T00:00:00Z", owner: { login: "owner" } }] }))
+  }));
+  assert.equal(result.ok, true);
+});
+
+test("Hacker News top stories use the single-request Algolia front-page API", async () => {
+  const url = "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=1";
+  const requests: string[] = [];
+  const result = await new HackerNewsAdapter().fetch(source("hn", "hn", { mode: "topstories", limit: 1 }), context({
+    [url]: response(JSON.stringify({ hits: [{ objectID: "42", title: "HN story", author: "user", created_at: "2026-08-28T00:00:00Z", points: 120, num_comments: 30 }] }))
+  }, undefined, requests));
+  assert.equal(result.ok && result.items[0]?.url, "https://news.ycombinator.com/item?id=42");
+  assert.match(result.ok ? result.items[0]!.excerpt : "", /120 points/);
+  assert.deepEqual(requests, [url]);
+});
+
+test("Hacker News top stories fall back to Firebase when Algolia fails", async () => {
+  const algolia = "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=1";
   const base = "https://hacker-news.firebaseio.com/v0";
   const result = await new HackerNewsAdapter().fetch(source("hn", "hn", { mode: "topstories", limit: 1 }), context({
+    [algolia]: new Error("request timeout"),
     [`${base}/topstories.json`]: response("[42]"),
     [`${base}/item/42.json`]: response(JSON.stringify({ id: 42, type: "story", title: "HN story", by: "user", time: 1787875200 }))
   }));
-  assert.equal(result.ok && result.items[0]?.url, "https://news.ycombinator.com/item?id=42");
+  assert.equal(result.ok && result.items[0]?.externalId, "42");
 });
 
 test("RSSHub-compatible failures include self-hosted fallback and cancellation is explicit", async () => {

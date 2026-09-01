@@ -23,6 +23,23 @@ test("Chinese translator renders the provider guidance in Chinese", () => {
   assert.equal(createTranslator("zh-CN")("provider_manual_model"), "可手动输入模型 ID，或点击刷新从当前 Provider 加载模型。");
 });
 
+test("Chinese translator renders the topic suggestion library", () => {
+  const translate = createTranslator("zh-CN");
+  assert.equal(translate("suggested_topics"), "可选关注主题");
+  assert.equal(translate("suggestion_group_ai"), "AI 与智能体");
+  assert.equal(translate("add_topic_desc"), "会在标题和摘录中进行不区分大小写的匹配。");
+});
+
+test("Chinese translator labels source keywords", () => {
+  assert.equal(createTranslator("zh-CN")("source_keywords"), "关键词");
+});
+
+test("run guidance keeps the external Writer out of the regular settings flow", () => {
+  const description = createTranslator("zh-CN")("section_run_desc");
+  assert.equal(description, "手动运行，也可以用已配置的 AI Provider 改进已保存日报。");
+  assert.equal(description.includes("外部 Writer"), false);
+});
+
 test("unknown translation keys are returned without blocking rendering", () => {
   const translate = createTranslator("en") as unknown as (key: "missing_key") => string;
   assert.equal(translate("missing_key"), "missing_key");

@@ -115,6 +115,40 @@
   overflow-wrap: anywhere;
 }
 
+.trending-radar-source-intro {
+  color: var(--text-normal);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.trending-radar-source-keywords {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.trending-radar-source-keywords-label {
+  margin-right: 2px;
+}
+
+.trending-radar-source-keyword {
+  background: var(--background-modifier-hover);
+  border: 1px solid var(--tr-radar-border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+  padding: 2px 7px;
+}
+
+.trending-radar-source-technical {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  margin-top: 8px;
+}
+
 .trending-radar-source-card .setting-item-control {
   flex-shrink: 0;
   gap: 4px;
@@ -162,6 +196,61 @@
   padding: 0;
 }
 
+.trending-radar-topic-suggestions {
+  border-top: 1px solid var(--tr-radar-border);
+  margin-top: 12px;
+  padding-top: 16px;
+}
+
+.trending-radar-topic-suggestions h4 {
+  font-size: var(--font-ui-medium);
+  margin: 0 0 4px;
+}
+
+.trending-radar-topic-suggestions > p {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin: 0 0 14px;
+}
+
+.trending-radar-topic-suggestion-group {
+  align-items: flex-start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(110px, 0.25fr) minmax(0, 1fr);
+  margin-top: 10px;
+}
+
+.trending-radar-topic-suggestion-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 30px;
+}
+
+.trending-radar-topic-suggestion-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trending-radar-topic-suggestion {
+  background: var(--background-primary);
+  border: 1px solid var(--tr-radar-border);
+  border-radius: 999px;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-ui-small);
+  min-height: 30px;
+  padding: 3px 10px;
+}
+
+.trending-radar-topic-suggestion:hover,
+.trending-radar-topic-suggestion:focus-visible {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
 .trending-radar-empty-inline {
   color: var(--text-muted);
   font-size: var(--font-ui-small);
@@ -191,6 +280,15 @@
 @media (max-width: 760px) {
   .trending-radar-source-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trending-radar-topic-suggestion-group {
+    gap: 4px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trending-radar-topic-suggestion-label {
+    line-height: 1.5;
   }
 
   .trending-radar-section .setting-item,

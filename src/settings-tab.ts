@@ -1,8 +1,10 @@
 import { Modal, Notice, PluginSettingTab, Setting, setIcon, type App } from "obsidian";
 import type TrendingRadarPlugin from "./main.js";
 import { SOURCE_KINDS, type Profile, type SourceConfig, type SourceKind } from "./types.js";
-import type { Translator } from "./i18n.js";
+import type { TranslationKey, Translator } from "./i18n.js";
 import { captureScrollPosition, restoreScrollPosition, type ScrollPositionSnapshot } from "./settings-scroll.js";
+import { availableTopicSuggestionGroups, type TopicSuggestionGroupId } from "./topic-suggestions.js";
+import { getSourceGuide } from "./source-guide.js";
 
 const SOURCE_GROUPS: Array<{ kinds: SourceKind[]; labelKey: "source_group_feeds" | "source_group_web" | "source_group_github" | "source_group_hn" }> = [
   { kinds: ["rss", "rsshub-compatible"], labelKey: "source_group_feeds" },
@@ -10,6 +12,12 @@ const SOURCE_GROUPS: Array<{ kinds: SourceKind[]; labelKey: "source_group_feeds"
   { kinds: ["github"], labelKey: "source_group_github" },
   { kinds: ["hn"], labelKey: "source_group_hn" }
 ];
+
+const TOPIC_SUGGESTION_LABEL_KEYS: Record<TopicSuggestionGroupId, TranslationKey> = {
+  ai: "suggestion_group_ai",
+  development: "suggestion_group_development",
+  industry: "suggestion_group_industry"
+};
 
 function createSection(parent: HTMLElement, icon: string, title: string, description: string): HTMLElement {
   const section = parent.createDiv({ cls: "trending-radar-section" });
@@ -33,6 +41,16 @@ function sourceSummary(source: SourceConfig, t: Translator): string {
   return source.kind === "rss"
     ? t("source_summary_rss", { url: String(source.url ?? t("source_summary_url_missing")) })
     : t("source_summary_rsshub", { url: String(source.url ?? t("source_summary_url_missing")) });
+}
+
+function renderSourceDescription(setting: Setting, source: SourceConfig, locale: "en" | "zh-CN", t: Translator): void {
+  const guide = getSourceGuide(source, locale);
+  setting.descEl.empty();
+  setting.descEl.createDiv({ cls: "trending-radar-source-intro", text: guide.intro });
+  const keywords = setting.descEl.createDiv({ cls: "trending-radar-source-keywords" });
+  keywords.createSpan({ cls: "trending-radar-source-keywords-label", text: t("source_keywords") });
+  for (const keyword of guide.keywords) keywords.createSpan({ cls: "trending-radar-source-keyword", text: keyword });
+  setting.descEl.createDiv({ cls: "trending-radar-source-technical", text: `${source.sourceId} · ${sourceSummary(source, t)}` });
 }
 
 function sourceKindLabel(t: Translator, kind: SourceKind): string {
@@ -351,7 +369,9 @@ export class TrendingRadarSettingTab extends PluginSettingTab {
       const grid = details.createDiv({ cls: "trending-radar-source-grid" });
       for (const source of sources) {
         const card = grid.createDiv({ cls: `trending-radar-source-card${source.enabled ? " is-enabled" : ""}` });
-        new Setting(card).setName(sourceName(source)).setDesc(`${source.sourceId} · ${sourceSummary(source, this.t)}`).addToggle((toggle) => toggle
+        const sourceSetting = new Setting(card).setName(sourceName(source));
+        renderSourceDescription(sourceSetting, source, this.plugin.getLocale(), this.t);
+        sourceSetting.addToggle((toggle) => toggle
           .setValue(source.enabled)
           .onChange((value) => void this.changeProfile((draft) => {
             const current = draft.sources.find((entry) => entry.sourceId === source.sourceId);
@@ -392,6 +412,31 @@ export class TrendingRadarSettingTab extends PluginSettingTab {
       });
     }).addButton((button) => button.setButtonText(this.t("add")).setIcon("plus").onClick(() => void this.addTopic(topic, profile)));
     addSetting.controlEl.addClass("trending-radar-topic-input");
+
+    const suggestions = section.createDiv({ cls: "trending-radar-topic-suggestions" });
+    suggestions.createEl("h4", { text: this.t("suggested_topics") });
+    suggestions.createEl("p", { text: this.t("suggested_topics_desc") });
+    const groups = availableTopicSuggestionGroups(profile.topics);
+    if (groups.length === 0) {
+      suggestions.createDiv({ cls: "trending-radar-empty-inline", text: this.t("no_suggested_topics") });
+      return;
+    }
+    for (const group of groups) {
+      const groupEl = suggestions.createDiv({ cls: "trending-radar-topic-suggestion-group" });
+      groupEl.createDiv({ cls: "trending-radar-topic-suggestion-label", text: this.t(TOPIC_SUGGESTION_LABEL_KEYS[group.id]) });
+      const list = groupEl.createDiv({ cls: "trending-radar-topic-suggestion-list" });
+      for (const suggestedTopic of group.topics) {
+        const button = list.createEl("button", {
+          cls: "trending-radar-topic-suggestion",
+          text: suggestedTopic,
+          attr: {
+            type: "button",
+            "aria-label": this.t("add_suggested_topic", { topic: suggestedTopic })
+          }
+        });
+        button.addEventListener("click", () => void this.addTopic(suggestedTopic, profile));
+      }
+    }
   }
 
   private renderFilters(parent: HTMLElement, profile: Profile): void {
@@ -422,7 +467,6 @@ export class TrendingRadarSettingTab extends PluginSettingTab {
         }
       });
     new Setting(section).setName(this.t("run_ai")).setDesc(this.t("run_ai_desc")).addButton((button) => button.setButtonText(this.t("generate_draft")).setIcon("sparkles").onClick(() => void this.plugin.generateAiDraft()));
-    new Setting(section).setName(this.t("run_external")).setDesc(this.t("run_external_desc")).addButton((button) => button.setButtonText(this.t("apply_draft")).setIcon("file-check").onClick(() => void this.plugin.applyExternalDraft()));
     new Setting(section).setName(this.t("last_run")).setDesc(this.plugin.settings.lastRunSummary || this.t("no_run_recorded"));
   }
 

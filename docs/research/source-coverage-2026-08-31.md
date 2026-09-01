@@ -67,7 +67,8 @@
 - 本研究没有爬取 Tophub；Tophub 只能作为分类/发现参考，不能作为事实源。
 - “HTTP 200”只证明一次可达，不证明内容完整、排序合理或长期可用。默认纳入前至少需要连续多日 smoke、失败率、重复率、主题命中率和最终入选数证据。
 - 任何需要账号、Cookie、私有 token 或隐式认证头的入口，都不得写入共享 Profile；应由用户本地配置并保持失败可见。
-- 来源数量继续增加前，先解决每源最低/最高配额、多样性和质量排序，否则高频综合源会吞掉日报名额。
+- 来源数量继续增加时，优先完善去重、质量门禁、主题相关性和发布时间排序；不要用人为分区
+  配额替代趋势判断。高频综合源是否保留，应由这些质量信号和用户关注主题决定。
 
 ## 参考探测命令
 
@@ -79,4 +80,3 @@ Invoke-WebRequest 'https://hacker-news.firebaseio.com/v0/topstories.json'
 Invoke-WebRequest 'https://export.arxiv.org/api/query?search_query=cat:cs.AI&start=0&max_results=1'
 Invoke-WebRequest 'https://segmentfault.com/feeds'
 ```
-

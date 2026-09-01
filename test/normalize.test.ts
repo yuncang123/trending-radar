@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canonicalizeUrl, deduplicateItems, isPrivateNetworkHost, normalizeItem } from "../src/normalize.js";
+import { canonicalizeUrl, deduplicateItems, isPrivateNetworkHost, normalizeItem, replaceSourceItems } from "../src/normalize.js";
 import type { RawItem } from "../src/normalize.js";
 
 const raw = (overrides: Partial<RawItem> = {}): RawItem => ({
@@ -39,4 +39,10 @@ test("dedupe prioritizes source external ID, then canonical URL", () => {
   const sameUrl = normalizeItem(raw({ sourceId: "rss-b", externalId: null }))!;
   assert.deepEqual(deduplicateItems([first, sameExternal, sameUrl]), [first]);
   assert.equal(normalizeItem(raw())?.contentHash, normalizeItem(raw())?.contentHash);
+});
+
+test("replacing a refreshed source removes its stale snapshot before dedupe", () => {
+  const oldItem = normalizeItem(raw({ title: "Old", excerpt: "old" }))!;
+  const newItem = normalizeItem(raw({ title: "New", excerpt: "new" }))!;
+  assert.deepEqual(replaceSourceItems([oldItem], "rss-a", [newItem]), [newItem]);
 });

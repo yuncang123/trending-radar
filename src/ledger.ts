@@ -102,7 +102,7 @@ export function finalizeRunStatus(ledger: RunLedger, cancelRequested = ledger.ca
   return next;
 }
 
-export function sourcesToRun(previous: RunLedger | undefined, profile: Profile, currentVersions: Record<string, SourceVersions>): string[] {
+export function sourcesToRun(previous: RunLedger | undefined, profile: Profile, currentVersions: Record<string, SourceVersions>, now = new Date().toISOString()): string[] {
   if (!previous || previous.profileId !== profile.profileId || previous.profileVersion !== profile.version) {
     return profile.sources.filter((source) => source.enabled).map((source) => source.sourceId);
   }
@@ -110,13 +110,19 @@ export function sourcesToRun(previous: RunLedger | undefined, profile: Profile, 
     if (!source.enabled) return false;
     const prior = previous?.sources[source.sourceId];
     const current = currentVersions[source.sourceId] ?? { adapterVersion: "v1", parserVersion: "v1" };
-    return !(prior?.status === "succeeded" && prior.adapterVersion === current.adapterVersion && prior.parserVersion === current.parserVersion);
+    if (!(prior?.status === "succeeded" && prior.adapterVersion === current.adapterVersion && prior.parserVersion === current.parserVersion)) return true;
+    const configuredAge = profile.filter.reuseMaxAgeMinutes;
+    if (typeof configuredAge !== "number" || !Number.isInteger(configuredAge) || configuredAge < 0) return false;
+    if (configuredAge === 0) return true;
+    const finishedAt = prior.finishedAt ? Date.parse(prior.finishedAt) : Number.NaN;
+    const nowMs = Date.parse(now);
+    return !Number.isFinite(finishedAt) || !Number.isFinite(nowMs) || nowMs - finishedAt > configuredAge * 60_000;
   }).map((source) => source.sourceId);
 }
 
-export function carryForwardReusableSources(ledger: RunLedger, previous: RunLedger | undefined, profile: Profile, currentVersions: Record<string, SourceVersions>): RunLedger {
+export function carryForwardReusableSources(ledger: RunLedger, previous: RunLedger | undefined, profile: Profile, currentVersions: Record<string, SourceVersions>, now = new Date().toISOString()): RunLedger {
   if (!previous) return ledger;
-  const rerun = new Set(sourcesToRun(previous, profile, currentVersions));
+  const rerun = new Set(sourcesToRun(previous, profile, currentVersions, now));
   const next = clone(ledger);
   for (const source of profile.sources) {
     if (!source.enabled || rerun.has(source.sourceId)) continue;

@@ -42,6 +42,16 @@ test("resume skips only version-matching successful sources", () => {
   }), ["hn"]);
 });
 
+test("refresh policy reruns successful sources once their reuse age expires", () => {
+  let previous = createRunLedger({ ...profile, filter: { reuseMaxAgeMinutes: 60 } }, "run-previous", "2026-08-28T00:00:00Z");
+  previous = markSourceSucceeded(previous, "rss-a", "sources/rss-a.json", "2026-08-28T00:30:00Z");
+  previous = markSourceSucceeded(previous, "hn", "sources/hn.json", "2026-08-28T00:30:00Z");
+  const versions = { "rss-a": { adapterVersion: "v1", parserVersion: "v1" }, hn: { adapterVersion: "v1", parserVersion: "v1" } };
+  assert.deepEqual(sourcesToRun(previous, { ...profile, filter: { reuseMaxAgeMinutes: 60 } }, versions, "2026-08-28T01:00:00Z"), []);
+  assert.deepEqual(sourcesToRun(previous, { ...profile, filter: { reuseMaxAgeMinutes: 60 } }, versions, "2026-08-28T01:31:00Z"), ["rss-a", "hn"]);
+  assert.deepEqual(sourcesToRun(previous, { ...profile, filter: { reuseMaxAgeMinutes: 0 } }, versions, "2026-08-28T00:31:00Z"), ["rss-a", "hn"]);
+});
+
 test("run ledger records current adapter and parser versions", () => {
   const ledger = createRunLedger(profile, "run-versions", "2026-08-28T00:00:00Z", {
     "rss-a": { adapterVersion: "rss-v2", parserVersion: "parser-v3" }

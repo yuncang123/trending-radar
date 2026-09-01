@@ -12,7 +12,10 @@ test("Chinese Source Pack v2 is public, enabled, and directly RSS-backed", () =>
   const enabled = profile.sources.filter((source) => source.enabled);
 
   assert.equal(profile.profileId, "chinese-tech-v2");
-  assert.equal(enabled.length, 9);
+  assert.equal(enabled.length, 10);
+  assert.equal(enabled.some((source) => source.sourceId === "cn-juejin"), false);
+  assert.ok(enabled.some((source) => source.sourceId === "cn-meituan-tech"));
+  assert.ok(enabled.some((source) => source.sourceId === "cn-ruanyifeng-weekly"));
   assert.equal(new Set(enabled.map((source) => source.sourceId)).size, enabled.length);
   assert.equal(new Set(enabled.map((source) => new URL(String(source.url)).hostname)).size, enabled.length);
   assert.ok(enabled.every((source) => source.kind === "rss"));
@@ -79,10 +82,13 @@ test("broad trending profile combines all source families into one sectioned run
   const sections = profile.filter.sections as Array<{ sourceIds: string[] }>;
 
   assert.equal(profile.profileId, "broad-trending-v1");
-  assert.equal(enabled.length, 20);
+  assert.equal(enabled.length, 21);
+  assert.equal(enabled.some((source) => source.sourceId === "cn-juejin"), false);
+  assert.ok(enabled.some((source) => source.sourceId === "cn-meituan-tech"));
+  assert.ok(enabled.some((source) => source.sourceId === "cn-ruanyifeng-weekly"));
   assert.equal(sections.length, 4);
   assert.equal(new Set(sections.flatMap((section) => section.sourceIds)).size, enabled.length);
-  assert.equal(profile.filter.maxItemsPerSource, 4);
+  assert.equal(profile.filter.maxItemsPerSource, undefined);
   assert.equal(profile.templateId, "sectioned-v1");
   assert.equal(/api.?key|authorization|credential|password|token/i.test(raw), false);
 });
