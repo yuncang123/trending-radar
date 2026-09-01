@@ -1,4 +1,5 @@
-import type { DraftInput, NormalizedItem, SourceFailure, WriterOutput } from "./types.js";
+import { isLowQualityExcerpt } from "./normalize.js";
+import type { DraftInput, DraftSectionSelection, NormalizedItem, SourceFailure, WriterOutput } from "./types.js";
 
 const DEFAULT_MAX_ITEMS = 50;
 
@@ -11,26 +12,89 @@ function requireTopicMatch(filter: Record<string, unknown>): boolean {
   return filter.requireTopicMatch === true;
 }
 
+interface SectionConfig {
+  sectionId: string;
+  label: string;
+  sourceIds: string[];
+  maxItems: number;
+  keywords?: string[];
+  excludeKeywords?: string[];
+}
+
+function sectionConfigs(filter: Record<string, unknown>): SectionConfig[] {
+  if (!Array.isArray(filter.sections)) return [];
+  return filter.sections.flatMap((value) => {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return [];
+    const section = value as Record<string, unknown>;
+    if (typeof section.sectionId !== "string" || typeof section.label !== "string" || !Array.isArray(section.sourceIds)) return [];
+    const sourceIds = section.sourceIds.filter((sourceId): sourceId is string => typeof sourceId === "string");
+    const maxItems = Number(section.maxItems);
+    if (sourceIds.length === 0 || !Number.isInteger(maxItems) || maxItems <= 0) return [];
+    const keywords = Array.isArray(section.keywords) ? section.keywords.filter((value): value is string => typeof value === "string" && value.trim() !== "").map((value) => value.toLowerCase()) : undefined;
+    const excludeKeywords = Array.isArray(section.excludeKeywords) ? section.excludeKeywords.filter((value): value is string => typeof value === "string" && value.trim() !== "").map((value) => value.toLowerCase()) : undefined;
+    return [{ sectionId: section.sectionId, label: section.label, sourceIds, maxItems, ...(keywords?.length ? { keywords } : {}), ...(excludeKeywords?.length ? { excludeKeywords } : {}) }];
+  });
+}
+
+function itemText(item: NormalizedItem): string {
+  return `${item.title} ${item.excerpt}`.toLowerCase();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function textIncludesKeyword(text: string, keyword: string): boolean {
+  const normalized = keyword.trim().toLowerCase();
+  if (!normalized) return false;
+  const startsWithAsciiWord = /^[a-z0-9]/.test(normalized);
+  const endsWithAsciiWord = /[a-z0-9]$/.test(normalized);
+  if (!startsWithAsciiWord && !endsWithAsciiWord) return text.includes(normalized);
+  const prefix = startsWithAsciiWord ? "(?:^|[^a-z0-9])" : "";
+  const suffix = endsWithAsciiWord ? "(?![a-z0-9])" : "";
+  return new RegExp(`${prefix}${escapeRegExp(normalized)}${suffix}`).test(text);
+}
+
 function topicScore(item: NormalizedItem, topics: string[]): number {
   if (topics.length === 0) return 0;
-  const haystack = `${item.title} ${item.excerpt} ${item.sourceId}`.toLowerCase();
-  return topics.reduce((score, topic) => score + (haystack.includes(topic.toLowerCase()) ? 1 : 0), 0);
+  const haystack = itemText(item);
+  return topics.reduce((score, topic) => score + (textIncludesKeyword(haystack, topic) ? 1 : 0), 0);
+}
+
+function containsKeyword(item: NormalizedItem, keywords: string[] | undefined): boolean {
+  const text = itemText(item);
+  return Boolean(keywords?.some((keyword) => textIncludesKeyword(text, keyword)));
+}
+
+function matchesSection(item: NormalizedItem, section: SectionConfig): boolean {
+  if (!section.sourceIds.includes(item.sourceId)) return false;
+  if (containsKeyword(item, section.excludeKeywords)) return false;
+  if (section.keywords?.length) return containsKeyword(item, section.keywords);
+  return true;
+}
+
+function matchesSelectedSection(item: NormalizedItem, section: DraftSectionSelection): boolean {
+  if (!section.sourceIds.includes(item.sourceId)) return false;
+  if (containsKeyword(item, section.excludeKeywords)) return false;
+  if (section.keywords?.length) return containsKeyword(item, section.keywords);
+  return true;
 }
 
 function compareText(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-function publishedTime(value: string | null): number {
+function publishedTime(value: string | null, nowMs: number): number {
   if (!value) return Number.NEGATIVE_INFINITY;
   const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+  if (!Number.isFinite(parsed) || parsed > nowMs + 5 * 60_000) return Number.NEGATIVE_INFINITY;
+  return parsed;
 }
 
-function compareItems(a: NormalizedItem, b: NormalizedItem, topics: string[]): number {
+function compareItems(a: NormalizedItem, b: NormalizedItem, topics: string[], nowMs: number): number {
   const scoreDelta = topicScore(b, topics) - topicScore(a, topics);
   if (scoreDelta !== 0) return scoreDelta;
-  const dateDelta = publishedTime(b.publishedAt) - publishedTime(a.publishedAt);
+  const dateDelta = publishedTime(b.publishedAt, nowMs) - publishedTime(a.publishedAt, nowMs);
   if (dateDelta !== 0) return dateDelta;
   const sourceDelta = compareText(a.sourceId, b.sourceId);
   if (sourceDelta !== 0) return sourceDelta;
@@ -42,9 +106,54 @@ function compareItems(a: NormalizedItem, b: NormalizedItem, topics: string[]): n
 export function selectTrendItems(items: NormalizedItem[], topics: string[], filter: Record<string, unknown>): { items: NormalizedItem[]; selection: DraftInput["selection"] } {
   const maxItems = filterNumber(filter, "maxItems", DEFAULT_MAX_ITEMS);
   const mustMatch = requireTopicMatch(filter);
-  const candidates = mustMatch && topics.length > 0 ? items.filter((item) => topicScore(item, topics) > 0) : items;
-  const selected = [...candidates].sort((a, b) => compareItems(a, b, topics)).slice(0, maxItems);
-  return { items: selected, selection: { candidateCount: items.length, selectedCount: selected.length, maxItems, requireTopicMatch: mustMatch } };
+  const retrievedTimes = items.map((item) => Date.parse(item.retrievedAt)).filter((value) => Number.isFinite(value));
+  const nowMs = retrievedTimes.length > 0 ? Math.max(...retrievedTimes) : Date.now();
+  const excludedKeywords = Array.isArray(filter.excludeKeywords) ? filter.excludeKeywords.filter((value): value is string => typeof value === "string" && value.trim() !== "").map((value) => value.toLowerCase()) : [];
+  const qualityFiltered = items.filter((item) => filter.excludeLowQuality !== true || !isLowQualityExcerpt(item.excerpt));
+  const dateFiltered = qualityFiltered.filter((item) => filter.rejectFuturePublishedAt !== true || publishedTime(item.publishedAt, nowMs) !== Number.NEGATIVE_INFINITY || !item.publishedAt);
+  const topicFiltered = mustMatch && topics.length > 0 ? dateFiltered.filter((item) => topicScore(item, topics) > 0) : dateFiltered;
+  const candidates = topicFiltered.filter((item) => !excludedKeywords.some((keyword) => textIncludesKeyword(itemText(item), keyword)));
+  const ranked = [...candidates].sort((a, b) => compareItems(a, b, topics, nowMs));
+  const sections = sectionConfigs(filter);
+  // Relevance is decided globally. Sections only organize the already selected
+  // trends; their order, caps, exploration, and backfill flags never displace
+  // a higher-ranked item from another section.
+  const selected = ranked.slice(0, maxItems);
+  if (sections.length === 0) {
+    return { items: selected, selection: { candidateCount: items.length, selectedCount: selected.length, maxItems, requireTopicMatch: mustMatch } };
+  }
+
+  const sectionSelections: DraftSectionSelection[] = sections.map((section) => ({
+    sectionId: section.sectionId,
+    label: section.label,
+    sourceIds: section.sourceIds,
+    maxItems: section.maxItems,
+    selectedCount: selected.filter((item) => matchesSection(item, section)).length,
+    ...(section.keywords ? { keywords: section.keywords } : {}),
+    ...(section.excludeKeywords ? { excludeKeywords: section.excludeKeywords } : {})
+  }));
+  const assignedItems = new Set(selected.filter((item) => sectionSelections.some((section) => matchesSelectedSection(item, section))));
+  const unassigned = selected.filter((item) => !assignedItems.has(item));
+  if (unassigned.length > 0) {
+    sectionSelections.push({
+      sectionId: "other",
+      label: "Other",
+      sourceIds: [...new Set(unassigned.map((item) => item.sourceId))].sort(compareText),
+      maxItems: unassigned.length,
+      selectedCount: unassigned.length
+    });
+  }
+
+  return {
+    items: selected,
+    selection: {
+      candidateCount: items.length,
+      selectedCount: selected.length,
+      maxItems,
+      requireTopicMatch: mustMatch,
+      sections: sectionSelections
+    }
+  };
 }
 
 export function createDraftInput(args: {
@@ -74,11 +183,11 @@ function failureLine(failure: SourceFailure): string {
     `\`${safeText(failure.code)}\`): ${safeText(failure.message)}; ${retry}${fallback}`;
 }
 
-function itemBlock(item: NormalizedItem, index: number): string {
+function itemBlock(item: NormalizedItem, index: number, headingLevel = 3): string {
   const published = item.publishedAt ? safeText(item.publishedAt) : "unknown";
   const verification = `reachable=${item.verification.reachable}; status=${item.verification.status ?? "unknown"}; checked=${safeText(item.verification.checkedAt)}`;
   return [
-    `### ${index}. ${safeText(item.title)}`,
+    `${"#".repeat(headingLevel)} ${index}. ${safeText(item.title)}`,
     `- Link: <${item.url}>`,
     `- Source: \`${safeText(item.sourceId)}\``,
     `- Published: ${published}`,
@@ -88,11 +197,36 @@ function itemBlock(item: NormalizedItem, index: number): string {
   ].join("\n");
 }
 
+function renderSelectedItems(input: DraftInput): string {
+  const sections = input.selection.sections;
+  if (!sections || sections.length === 0) {
+    return input.items.length > 0
+      ? input.items.map((item, index) => itemBlock(item, index + 1)).join("\n")
+      : "No usable items were selected. Check source failures, topics, and filter settings.\n";
+  }
+
+  let itemIndex = 1;
+  const renderedItems = new Set<NormalizedItem>();
+  const blocks = sections.map((section) => {
+    const sectionItems = input.items.filter((item) => !renderedItems.has(item) && matchesSelectedSection(item, section));
+    sectionItems.forEach((item) => renderedItems.add(item));
+    const body = sectionItems.length > 0
+      ? sectionItems.map((item) => itemBlock(item, itemIndex++, 4)).join("\n")
+      : "- No items selected.\n";
+    return [`### ${safeText(section.label)} (${sectionItems.length})`, "", body].join("\n");
+  });
+  if (renderedItems.size < input.items.length) {
+    const remaining = input.items.filter((item) => !renderedItems.has(item));
+    blocks.push(["### Other", "", remaining.map((item) => itemBlock(item, itemIndex++, 4)).join("\n")].join("\n"));
+  }
+  return blocks.join("\n");
+}
+
 export function renderTemplateDraft(input: DraftInput): WriterOutput {
   const date = input.generatedAt.slice(0, 10);
   const title = `Trending Radar ${date}`;
   const failures = input.failures.length > 0 ? input.failures.map(failureLine).join("\n") : "- None";
-  const items = input.items.length > 0 ? input.items.map(itemBlock).join("\n") : "No usable items were selected. Check source failures, topics, and filter settings.\n";
+  const items = renderSelectedItems(input);
   const markdown = [
     `# ${title}`,
     "",
@@ -122,6 +256,7 @@ export function appendFactAppendix(input: DraftInput, markdown: string): string 
     `- Profile: ${input.profileId} / ${input.profileVersion}`,
     `- Candidates: ${input.selection.candidateCount}; selected: ${input.selection.selectedCount}`,
     `- Topics: ${input.topics.length > 0 ? input.topics.map(safeText).join(", ") : "none"}`,
+    ...(input.selection.sections ?? []).map((section) => `- Section: ${safeText(section.sectionId)} | ${safeText(section.label)} | selected=${section.selectedCount} | max=${section.maxItems}`),
     ...input.items.map((item) => `- Item: ${safeText(item.sourceId)} | ${safeText(item.title)} | ${item.url}`),
     ...input.failures.map((failure) => `- Failure: ${safeText(failure.sourceId)} | ${safeText(failure.stage)} | ${safeText(failure.code)}`)
   ];
@@ -158,6 +293,7 @@ export function validateExternalWriterOutput(input: DraftInput, candidate: unkno
     String(input.selection.candidateCount),
     String(input.selection.selectedCount),
     ...input.topics,
+    ...(input.selection.sections ?? []).map((section) => section.label),
     ...input.items.flatMap((item) => [item.sourceId, item.title, item.url]),
     ...input.failures.flatMap((failure) => [failure.sourceId, failure.stage, failure.code])
   ];

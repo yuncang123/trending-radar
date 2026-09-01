@@ -3,17 +3,72 @@ import type { FetchContext, SourceAdapter, SourceBatch, SourceConfig, SourceFail
 import { cancelled, errorFailure, failure, httpFailure } from "./shared.js";
 
 interface HnItem { id: number; title?: string; url?: string; by?: string; time?: number; text?: string; type?: string }
+interface AlgoliaHit { objectID?: string; title?: string; url?: string | null; author?: string; created_at?: string; story_text?: string | null; points?: number | null; num_comments?: number | null }
 
 const MODES = new Set(["topstories", "newstories", "beststories", "askstories", "showstories"]);
+const ALGOLIA_BASE = "https://hn.algolia.com/api/v1/search";
 
 export class HackerNewsAdapter implements SourceAdapter {
   readonly kind = "hn" as const;
-  readonly adapterVersion = "v1";
-  readonly parserVersion = "hn-firebase-v0";
+  readonly adapterVersion = "v2";
+  readonly parserVersion = "hn-algolia-v1+firebase-v0";
 
   async fetch(source: SourceConfig, context: FetchContext): Promise<SourceBatch | SourceFailure> {
     const mode = typeof source.mode === "string" && MODES.has(source.mode) ? source.mode : "topstories";
     const limit = Math.min(Math.max(Number(source.limit) || 30, 1), 100);
+    if (mode === "topstories") {
+      const algolia = await this.fetchAlgoliaFrontPage(source, limit, context);
+      if (algolia.ok || algolia.code === "CANCELLED") return algolia;
+    }
+    return this.fetchFirebase(source, mode, limit, context);
+  }
+
+  private async fetchAlgoliaFrontPage(source: SourceConfig, limit: number, context: FetchContext): Promise<SourceBatch | SourceFailure> {
+    const url = `${ALGOLIA_BASE}?tags=front_page&hitsPerPage=${limit}`;
+    try {
+      const response = await context.request(url);
+      const responseFailure = httpFailure(source.sourceId, response, context.now(), "Firebase fallback will be attempted.");
+      if (responseFailure) return responseFailure;
+      let hits: AlgoliaHit[];
+      try {
+        const parsed = JSON.parse(response.text) as { hits?: unknown };
+        hits = Array.isArray(parsed.hits) ? parsed.hits as AlgoliaHit[] : [];
+      } catch {
+        return failure(source.sourceId, "parse", "INVALID_JSON", "Algolia HN API returned invalid JSON.", true, context.now(), "Firebase fallback will be attempted.");
+      }
+      const retrievedAt = context.now();
+      const verification = { reachable: true, status: 200, sourceRef: url, checkedAt: retrievedAt, parserVersion: this.parserVersion };
+      let droppedCount = 0;
+      const items = [];
+      for (const hit of hits) {
+        const id = typeof hit.objectID === "string" ? hit.objectID : "";
+        const facts = [
+          typeof hit.points === "number" ? `${hit.points} points` : "",
+          typeof hit.num_comments === "number" ? `${hit.num_comments} comments` : ""
+        ].filter(Boolean).join("; ");
+        const item = normalizeItem({
+          sourceId: source.sourceId,
+          sourceKind: this.kind,
+          title: hit.title,
+          url: hit.url ?? (id ? `https://news.ycombinator.com/item?id=${id}` : undefined),
+          externalId: id || null,
+          publishedAt: hit.created_at ?? null,
+          author: hit.author ?? null,
+          excerpt: hit.story_text ?? facts,
+          retrievedAt,
+          parserVersion: this.parserVersion,
+          verification
+        });
+        if (item) items.push(item); else droppedCount += 1;
+      }
+      if (items.length === 0) return failure(source.sourceId, "verify", "EMPTY_RESULT", `Algolia HN API returned no usable stories; dropped ${droppedCount}.`, true, retrievedAt, "Firebase fallback will be attempted.");
+      return { ok: true, sourceId: source.sourceId, items, droppedCount, retrievedAt };
+    } catch (error) {
+      return cancelled(source.sourceId, context) ?? errorFailure(source.sourceId, error, context.now(), "Firebase fallback will be attempted.");
+    }
+  }
+
+  private async fetchFirebase(source: SourceConfig, mode: string, limit: number, context: FetchContext): Promise<SourceBatch | SourceFailure> {
     const base = "https://hacker-news.firebaseio.com/v0";
     try {
       const listResponse = await context.request(`${base}/${mode}.json`);

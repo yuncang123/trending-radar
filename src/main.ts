@@ -2,7 +2,7 @@ import { Notice, Plugin, requestUrl } from "obsidian";
 import { lookup } from "node:dns/promises";
 import { createAdapterRegistry } from "./adapters/index.js";
 import { attachLease, cancelRun, carryForwardReusableSources, createRunLedger, finalizeRunStatus, heartbeat, markRunInterrupted, markSourceCancelled, markSourceFailed, markSourceRunning, markSourceSucceeded, sourcesToRun } from "./ledger.js";
-import { deduplicateItems, isPrivateNetworkHost } from "./normalize.js";
+import { deduplicateItems, isPrivateNetworkHost, replaceSourceItems } from "./normalize.js";
 import { parseProfile, validateVaultRelativePath } from "./profile.js";
 import { createDefaultProfile, DEFAULT_PROFILE_PATH, reviseProfile } from "./profile-editor.js";
 import { LEASE_TTL_MS, LeaseHeldError, VaultLedgerStore } from "./run-store.js";
@@ -126,6 +126,7 @@ export default class TrendingRadarPlugin extends Plugin {
       const store = new VaultLedgerStore(this.app.vault.adapter, effectiveProfile.outputDirectory);
       leaseStore = store;
       const currentRunId = runId();
+      const runStartedAt = new Date().toISOString();
       lease = await store.acquireLease(currentRunId, this.ownerId);
       let previous = await store.loadLatestLedger();
       if (previous?.status === "running") {
@@ -137,8 +138,8 @@ export default class TrendingRadarPlugin extends Plugin {
         const adapter = adapters.get(source.kind);
         return [source.sourceId, { adapterVersion: adapter?.adapterVersion ?? "unavailable", parserVersion: adapter?.parserVersion ?? "unavailable" }];
       }));
-      let ledger = carryForwardReusableSources(attachLease(createRunLedger(effectiveProfile, currentRunId, new Date().toISOString(), currentVersions), lease), previous, effectiveProfile, currentVersions);
-      const sourceIds = sourcesToRun(previous, effectiveProfile, currentVersions);
+      let ledger = carryForwardReusableSources(attachLease(createRunLedger(effectiveProfile, currentRunId, runStartedAt, currentVersions), lease), previous, effectiveProfile, currentVersions, runStartedAt);
+      const sourceIds = sourcesToRun(previous, effectiveProfile, currentVersions, runStartedAt);
       const enabledSourceCount = effectiveProfile.sources.filter((source) => source.enabled).length;
       const reusedSourceCount = enabledSourceCount - sourceIds.length;
       this.log("run_started", {
@@ -164,6 +165,10 @@ export default class TrendingRadarPlugin extends Plugin {
         for (const source of Object.values(ledger.sources)) accumulatedItems.push(...await store.loadSourceItems(source.resultFile));
         accumulatedItems = deduplicateItems(accumulatedItems);
       }
+      // A source scheduled for refresh must not retain its previous snapshot if the fetch fails.
+      // Otherwise a failed refresh would silently publish stale items as if they were current.
+      const refreshingSources = new Set(sourceIds);
+      accumulatedItems = accumulatedItems.filter((item) => !refreshingSources.has(item.sourceId));
       const context = this.createFetchContext(this.activeController.signal);
       this.showRunNotice(sourceIds.length > 0
         ? this.translate("notice_run_running", { current: sourceIds.length, total: enabledSourceCount })
@@ -207,7 +212,7 @@ export default class TrendingRadarPlugin extends Plugin {
           });
           this.showRunNotice(this.translate("notice_source_failed", { sourceId, stage: result.stage, code: result.code, message: result.message }));
         } else {
-          const combined = deduplicateItems([...accumulatedItems, ...result.items]);
+          const combined = replaceSourceItems(accumulatedItems, sourceId, result.items);
           const accepted = combined.filter((item) => item.sourceId === sourceId);
           accumulatedItems = combined;
           const resultFile = await store.saveSourceItems(ledger.runId, sourceId, accepted);

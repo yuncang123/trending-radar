@@ -30,3 +30,43 @@ test("rejects path traversal in source IDs and output directories", () => {
   assert.throws(() => parseProfile({ ...valid, sources: [{ sourceId: "../escape", kind: "rss", enabled: true }] }), /safe stable identifier/);
   assert.throws(() => parseProfile({ ...valid, outputDirectory: "../outside" }), /inside the vault/);
 });
+
+test("validates section metadata and legacy selection settings", () => {
+  const sectioned = parseProfile({
+    ...valid,
+    filter: {
+      maxItems: 10,
+      maxItemsPerSource: 2,
+      sections: [{ sectionId: "open-source", label: "开源观察", maxItems: 5, sourceIds: ["rss-a"] }]
+    }
+  });
+  assert.equal(sectioned.filter.maxItemsPerSource, 2);
+  assert.throws(() => parseProfile({ ...valid, filter: { sections: "invalid" } }), /filter.sections must be an array/);
+  assert.throws(() => parseProfile({
+    ...valid,
+    filter: { sections: [
+      { sectionId: "a", label: "A", maxItems: 1, sourceIds: ["rss-a"] },
+      { sectionId: "b", label: "B", maxItems: 1, sourceIds: ["rss-a"] }
+    ] }
+  }), /assigned to multiple sections/);
+});
+
+test("validates optional freshness, quality, and section matching settings", () => {
+  const parsed = parseProfile({
+    ...valid,
+    filter: {
+      reuseMaxAgeMinutes: 0,
+      excludeLowQuality: true,
+      rejectFuturePublishedAt: true,
+      excludeKeywords: ["游戏"],
+      explorePerSection: true,
+      backfill: true,
+      sections: [{ sectionId: "open-source", label: "开源观察", maxItems: 5, sourceIds: ["rss-a"], keywords: ["open source"], excludeKeywords: ["游戏"] }]
+    }
+  });
+  assert.equal(parsed.filter.reuseMaxAgeMinutes, 0);
+  assert.equal(parsed.filter.excludeLowQuality, true);
+  assert.throws(() => parseProfile({ ...valid, filter: { reuseMaxAgeMinutes: -1 } }), /reuseMaxAgeMinutes/);
+  assert.throws(() => parseProfile({ ...valid, filter: { excludeKeywords: [1] } }), /excludeKeywords/);
+  assert.throws(() => parseProfile({ ...valid, filter: { backfill: "yes" } }), /backfill/);
+});

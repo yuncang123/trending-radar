@@ -27,6 +27,117 @@ test("requireTopicMatch excludes non-matching items and puts null dates last", (
   assert.equal(selected.selection.candidateCount, 3);
 });
 
+test("source IDs do not create false topic matches", () => {
+  const selected = selectTrendItems([item("global-github-ai", "Unrelated repository", "2026-08-29T00:00:00Z")], ["AI"], { requireTopicMatch: true });
+  assert.equal(selected.items.length, 0);
+});
+
+test("short ASCII topics match whole terms instead of fragments inside unrelated words", () => {
+  const selected = selectTrendItems([
+    item("aircraft", "Aircraft remains aloft for a year", "2026-08-29T00:00:00Z"),
+    item("raindrops", "Raindrops are tiny lightning bolts", "2026-08-29T00:00:00Z"),
+    item("funding", "Polymarket raises new funding", "2026-08-29T00:00:00Z"),
+    item("ai", "An AI-powered coding assistant", "2026-08-29T00:00:00Z")
+  ], ["AI"], { requireTopicMatch: true });
+  assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["ai"]);
+});
+
+test("quality gates remove placeholder and future-dated items", () => {
+  const selected = selectTrendItems([
+    item("infoq", "AI placeholder", "2026-08-29T00:00:00Z", "点击查看原文>"),
+    item("rss", "AI future", "2999-01-01T00:00:00Z", "useful context"),
+    item("rss", "AI usable", "2026-08-29T00:00:00Z", "useful context")
+  ], ["AI"], { maxItems: 10, requireTopicMatch: true, excludeLowQuality: true, rejectFuturePublishedAt: true });
+  assert.deepEqual(selected.items.map((entry) => entry.title), ["AI usable"]);
+});
+
+test("sections classify globally selected trends and retain empty configured blocks", () => {
+  const selected = selectTrendItems([
+    item("oss-a", "Open source tool", "2026-08-29T04:00:00Z", "open source"),
+    item("oss-b", "Open source library", "2026-08-29T03:00:00Z", "open source"),
+    item("media", "AI launch", "2026-08-29T02:00:00Z", "AI product"),
+    item("extra", "AI discovery", "2026-08-29T01:00:00Z", "AI")
+  ], ["AI", "open source"], {
+    maxItems: 4,
+    maxItemsPerSource: 2,
+    explorePerSection: true,
+    backfill: true,
+    sections: [
+      { sectionId: "open-source", label: "开源观察", sourceIds: ["oss-a", "oss-b"], keywords: ["open source"], maxItems: 3 },
+      { sectionId: "media", label: "媒体资讯", sourceIds: ["missing"], keywords: ["media"], maxItems: 1 }
+    ]
+  });
+  assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["oss-a", "oss-b", "media", "extra"]);
+  assert.deepEqual(selected.selection.sections?.map((section) => [section.sectionId, section.selectedCount]), [["open-source", 2], ["media", 0], ["other", 2]]);
+});
+
+test("section order and caps cannot displace globally higher-ranked trends", () => {
+  const selected = selectTrendItems([
+    item("oss-a", "AI one", "2026-08-28T04:00:00Z"),
+    item("oss-a", "AI two", "2026-08-28T03:00:00Z"),
+    item("oss-a", "AI three", "2026-08-28T02:00:00Z"),
+    item("media-a", "AI product", "2026-08-28T06:00:00Z"),
+    item("media-a", "AI launch", "2026-08-28T05:00:00Z"),
+    item("media-a", "AI launch follow-up", "2026-08-28T01:00:00Z")
+  ], ["AI"], {
+    maxItems: 4,
+    maxItemsPerSource: 2,
+    sections: [
+      { sectionId: "open-source", label: "开源观察", sourceIds: ["oss-a", "oss-b"], maxItems: 3 },
+      { sectionId: "media", label: "媒体资讯", sourceIds: ["media-a"], maxItems: 2 }
+    ]
+  });
+
+  assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["media-a", "media-a", "oss-a", "oss-a"]);
+  assert.equal(selected.selection.maxItemsPerSource, undefined);
+  assert.deepEqual(selected.selection.sections?.map((section) => [section.sectionId, section.selectedCount]), [["open-source", 2], ["media", 2]]);
+});
+
+test("global ranking wins when the highest-scoring item belongs to a later section", () => {
+  const selected = selectTrendItems([
+    item("early", "AI ordinary", "2026-08-29T03:00:00Z"),
+    item("late", "AI Agent MCP breakthrough", "2026-08-29T02:00:00Z"),
+    item("early", "AI ordinary two", "2026-08-29T01:00:00Z")
+  ], ["AI", "Agent", "MCP"], {
+    maxItems: 1,
+    sections: [
+      { sectionId: "early", label: "前置分区", sourceIds: ["early"], maxItems: 1 },
+      { sectionId: "late", label: "后置分区", sourceIds: ["late"], maxItems: 1 }
+    ]
+  });
+
+  assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["late"]);
+  assert.deepEqual(selected.selection.sections?.map((section) => [section.sectionId, section.selectedCount]), [["early", 0], ["late", 1]]);
+});
+
+test("sectioned template renders one report with multiple blocks", () => {
+  const input = createDraftInput({
+    runId: "run-sectioned",
+    profileId: "broad",
+    profileVersion: "v1",
+    status: "completed",
+    generatedAt: "2026-08-29T00:10:00Z",
+    templateId: "sectioned-v1",
+    topics: ["AI"],
+    filter: {
+      maxItems: 4,
+      sections: [
+        { sectionId: "open-source", label: "开源观察", sourceIds: ["oss"], maxItems: 2 },
+        { sectionId: "media", label: "媒体资讯", sourceIds: ["media"], maxItems: 2 }
+      ]
+    },
+    items: [item("oss", "AI repository", "2026-08-29T00:00:00Z"), item("media", "AI launch", "2026-08-29T01:00:00Z")],
+    failures: []
+  });
+  const output = renderTemplateDraft(input);
+  assert.match(output.markdown, /### 开源观察 \(1\)/);
+  assert.match(output.markdown, /### 媒体资讯 \(1\)/);
+  assert.match(output.markdown, /#### 1\. AI repository/);
+  assert.match(output.markdown, /#### 2\. AI launch/);
+  assert.equal(validateExternalWriterOutput(input, output).ok, true);
+  assert.equal(validateExternalWriterOutput(input, { ...output, markdown: output.markdown.replace("媒体资讯", "其他") }).ok, false);
+});
+
 test("template draft always exposes status and failures, including an empty selection", () => {
   const input = createDraftInput({ runId: "run-1", profileId: "default", profileVersion: "v1", status: "partial", generatedAt: "2026-08-29T00:10:00Z", templateId: "default", topics: ["software"], filter: { maxItems: 1 }, items: [], failures: [failure] });
   const output = renderTemplateDraft(input);

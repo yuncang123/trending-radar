@@ -38,6 +38,51 @@ function vaultRelativePath(value: unknown, field: string): string {
   return path.replace(/^\.\//, "");
 }
 
+function validateSelectionFilter(filter: Record<string, unknown>): void {
+  if (filter.reuseMaxAgeMinutes !== undefined && (!Number.isInteger(filter.reuseMaxAgeMinutes) || Number(filter.reuseMaxAgeMinutes) < 0)) {
+    throw new Error("filter.reuseMaxAgeMinutes must be a non-negative integer");
+  }
+  for (const key of ["excludeKeywords"] as const) {
+    if (filter[key] !== undefined && (!Array.isArray(filter[key]) || filter[key].some((value) => typeof value !== "string" || value.trim() === ""))) {
+      throw new Error(`filter.${key} must be an array of non-empty strings`);
+    }
+  }
+  for (const key of ["excludeLowQuality", "rejectFuturePublishedAt", "explorePerSection", "backfill"] as const) {
+    if (filter[key] !== undefined && typeof filter[key] !== "boolean") throw new Error(`filter.${key} must be boolean`);
+  }
+  if (filter.maxItemsPerSource !== undefined && (!Number.isInteger(filter.maxItemsPerSource) || Number(filter.maxItemsPerSource) <= 0)) {
+    throw new Error("filter.maxItemsPerSource must be a positive integer");
+  }
+  if (filter.sections === undefined) return;
+  if (!Array.isArray(filter.sections)) throw new Error("filter.sections must be an array");
+
+  const sectionIds = new Set<string>();
+  const assignedSources = new Set<string>();
+  filter.sections.forEach((raw, index) => {
+    if (!isRecord(raw)) throw new Error(`filter.sections[${index}] must be an object`);
+    const sectionId = safeId(raw.sectionId, `filter.sections[${index}].sectionId`);
+    if (sectionIds.has(sectionId)) throw new Error(`duplicate sectionId: ${sectionId}`);
+    sectionIds.add(sectionId);
+    requiredString(raw.label, `filter.sections[${index}].label`);
+    if (!Number.isInteger(raw.maxItems) || Number(raw.maxItems) <= 0) {
+      throw new Error(`filter.sections[${index}].maxItems must be a positive integer`);
+    }
+    if (!Array.isArray(raw.sourceIds) || raw.sourceIds.length === 0) {
+      throw new Error(`filter.sections[${index}].sourceIds must be a non-empty array`);
+    }
+    raw.sourceIds.forEach((value, sourceIndex) => {
+      const sourceId = safeId(value, `filter.sections[${index}].sourceIds[${sourceIndex}]`);
+      if (assignedSources.has(sourceId)) throw new Error(`sourceId assigned to multiple sections: ${sourceId}`);
+      assignedSources.add(sourceId);
+    });
+    for (const key of ["keywords", "excludeKeywords"] as const) {
+      if (raw[key] !== undefined && (!Array.isArray(raw[key]) || raw[key].some((value) => typeof value !== "string" || value.trim() === ""))) {
+        throw new Error(`filter.sections[${index}].${key} must be an array of non-empty strings`);
+      }
+    }
+  });
+}
+
 export function validateVaultRelativePath(value: unknown, field = "path"): string {
   return vaultRelativePath(value, field);
 }
@@ -65,6 +110,7 @@ export function parseProfile(input: unknown): Profile {
     throw new Error("topics must be an array of strings");
   }
   if (!isRecord(input.filter)) throw new Error("filter must be an object");
+  validateSelectionFilter(input.filter);
 
   return {
     ...input,

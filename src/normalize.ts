@@ -3,6 +3,7 @@ import type { NormalizedItem, SourceKind, Verification } from "./types.js";
 
 const TRACKING_PARAMS = new Set(["fbclid", "gclid", "mc_cid", "mc_eid"]);
 const MAX_EXCERPT_LENGTH = 500;
+const PLACEHOLDER_EXCERPT = /^(?:点击查看原文[>＞]?|查看全文|comments?)$/i;
 
 export interface RawItem {
   sourceId: string;
@@ -29,6 +30,11 @@ export function canonicalizeUrl(value: string): string {
 
 export function compactText(value: string | null | undefined, maxLength = MAX_EXCERPT_LENGTH): string {
   return (value ?? "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+export function isLowQualityExcerpt(value: string | null | undefined): boolean {
+  const compact = compactText(value);
+  return compact.length === 0 || PLACEHOLDER_EXCERPT.test(compact);
 }
 
 export function normalizeItem(raw: RawItem): NormalizedItem | undefined {
@@ -70,6 +76,10 @@ export function deduplicateItems(items: NormalizedItem[]): NormalizedItem[] {
     hashes.add(item.contentHash);
     return true;
   });
+}
+
+export function replaceSourceItems(items: NormalizedItem[], sourceId: string, replacement: NormalizedItem[]): NormalizedItem[] {
+  return deduplicateItems([...items.filter((item) => item.sourceId !== sourceId), ...replacement]);
 }
 
 export function assertPublicHttpUrl(value: unknown, field = "url"): string {
