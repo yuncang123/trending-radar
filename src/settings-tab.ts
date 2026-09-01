@@ -414,7 +414,7 @@ export class TrendingRadarSettingTab extends PluginSettingTab {
     addSetting.controlEl.addClass("trending-radar-topic-input");
 
     const suggestions = section.createDiv({ cls: "trending-radar-topic-suggestions" });
-    suggestions.createEl("h4", { text: this.t("suggested_topics") });
+    new Setting(suggestions).setName(this.t("suggested_topics")).setHeading();
     suggestions.createEl("p", { text: this.t("suggested_topics_desc") });
     const groups = availableTopicSuggestionGroups(profile.topics);
     if (groups.length === 0) {
