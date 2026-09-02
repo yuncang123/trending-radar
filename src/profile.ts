@@ -53,6 +53,9 @@ function validateSelectionFilter(filter: Record<string, unknown>): void {
   if (filter.maxItemsPerSource !== undefined && (!Number.isInteger(filter.maxItemsPerSource) || Number(filter.maxItemsPerSource) <= 0)) {
     throw new Error("filter.maxItemsPerSource must be a positive integer");
   }
+  if (filter.maxAgeHours !== undefined && (!Number.isInteger(filter.maxAgeHours) || Number(filter.maxAgeHours) <= 0)) {
+    throw new Error("filter.maxAgeHours must be a positive integer");
+  }
   if (filter.sections === undefined) return;
   if (!Array.isArray(filter.sections)) throw new Error("filter.sections must be an array");
 

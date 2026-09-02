@@ -79,9 +79,10 @@ test("GitHub adapter paginates and reports rate limits and timeouts", async () =
 test("GitHub adapter can request popularity ordering explicitly", async () => {
   const url = "https://api.github.com/search/repositories?q=ai&sort=stars&order=desc&per_page=1&page=1";
   const result = await new GitHubAdapter().fetch(source("github", "github", { query: "ai", limit: 1, sort: "stars" }), context({
-    [url]: response(JSON.stringify({ items: [{ id: 1, full_name: "owner/repo", html_url: "https://github.com/owner/repo", description: "demo", updated_at: "2026-08-28T00:00:00Z", owner: { login: "owner" } }] }))
+    [url]: response(JSON.stringify({ items: [{ id: 1, full_name: "owner/repo", html_url: "https://github.com/owner/repo", description: "demo", updated_at: "2026-08-28T00:00:00Z", stargazers_count: 42, forks_count: 7, owner: { login: "owner" } }] }))
   }));
   assert.equal(result.ok, true);
+  assert.deepEqual(result.ok ? result.items[0]?.signals : undefined, { stars: 42, forks: 7 });
 });
 
 test("Hacker News top stories use the single-request Algolia front-page API", async () => {
@@ -92,6 +93,7 @@ test("Hacker News top stories use the single-request Algolia front-page API", as
   }, undefined, requests));
   assert.equal(result.ok && result.items[0]?.url, "https://news.ycombinator.com/item?id=42");
   assert.match(result.ok ? result.items[0]!.excerpt : "", /120 points/);
+  assert.deepEqual(result.ok ? result.items[0]?.signals : undefined, { points: 120, comments: 30 });
   assert.deepEqual(requests, [url]);
 });
 

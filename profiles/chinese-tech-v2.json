@@ -84,13 +84,14 @@
       "limit": 10
     }
   ],
-  "topics": ["AI", "Agent", "MCP", "大模型", "开发工具", "开源", "产品"],
+  "topics": ["AI", "Agent", "MCP", "大模型", "开发工具", "开源", "产品", "Claude", "Qwen", "DeepSeek", "LongCat", "OpenAI", "Anthropic", "智谱", "豆包", "通义", "混元", "多模态", "推理模型"],
   "filter": {
     "maxItems": 50,
     "requireTopicMatch": false,
     "reuseMaxAgeMinutes": 0,
     "excludeLowQuality": true,
-    "rejectFuturePublishedAt": true
+    "rejectFuturePublishedAt": true,
+    "maxAgeHours": 336
   },
   "templateId": "default"
 }

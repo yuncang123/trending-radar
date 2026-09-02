@@ -16,6 +16,7 @@ const SOURCE_GROUPS: Array<{ kinds: SourceKind[]; labelKey: "source_group_feeds"
 
 const TOPIC_SUGGESTION_LABEL_KEYS: Record<TopicSuggestionGroupId, TranslationKey> = {
   ai: "suggestion_group_ai",
+  "models-and-companies": "suggestion_group_models_and_companies",
   development: "suggestion_group_development",
   industry: "suggestion_group_industry"
 };
@@ -460,7 +461,13 @@ export class TrendingRadarSettingTab extends PluginSettingTab {
       .setLimits(1, 100, 1)
       .setDynamicTooltip()
       .setValue(maxItems)
-      .onChange((value) => void this.changeProfile((draft) => { draft.filter = { ...draft.filter, maxItems: value }; }, false)));
+       .onChange((value) => void this.changeProfile((draft) => { draft.filter = { ...draft.filter, maxItems: value }; }, false)));
+    const maxAgeHours = boundedInteger(profile.filter.maxAgeHours, 336, 24, 24 * 30);
+    new Setting(section).setName(this.t("filter_max_age")).setDesc(this.t("filter_max_age_desc")).addSlider((slider) => slider
+      .setLimits(24, 24 * 30, 24)
+      .setDynamicTooltip()
+      .setValue(maxAgeHours)
+      .onChange((value) => void this.changeProfile((draft) => { draft.filter = { ...draft.filter, maxAgeHours: value }; }, false)));
     new Setting(section).setName(this.t("filter_require_topic")).setDesc(this.t("filter_require_topic_desc")).addToggle((toggle) => toggle
       .setValue(profile.filter.requireTopicMatch === true)
       .onChange((value) => void this.changeProfile((draft) => { draft.filter = { ...draft.filter, requireTopicMatch: value }; })));

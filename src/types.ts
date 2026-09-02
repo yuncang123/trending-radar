@@ -81,6 +81,15 @@ export interface NormalizedItem {
   retrievedAt: string;
   parserVersion: string;
   verification: Verification;
+  /** Optional source-native popularity signals preserved for downstream ranking and writing. */
+  signals?: TrendSignals;
+}
+
+export interface TrendSignals {
+  points?: number;
+  comments?: number;
+  stars?: number;
+  forks?: number;
 }
 
 export interface SourceBatch {
@@ -109,7 +118,22 @@ export interface DraftSelection {
   requireTopicMatch: boolean;
   /** Legacy compatibility field; current selection is global and does not emit source caps. */
   maxItemsPerSource?: number;
+  /** Additive v1 extension: counts at each deterministic filtering stage. */
+  filterStats?: FilterStats;
   sections?: DraftSectionSelection[];
+}
+
+export interface FilterStats {
+  maxAgeHours: number;
+  collectedCount: number;
+  qualityPassedCount: number;
+  freshnessPassedCount: number;
+  topicMatchedCount: number;
+  topicPassedCount: number;
+  exclusionPassedCount: number;
+  effectiveCandidateCount: number;
+  unknownPublishedAtCount: number;
+  staleDroppedCount: number;
 }
 
 export interface DraftSectionSelection {

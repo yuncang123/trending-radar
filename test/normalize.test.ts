@@ -33,6 +33,20 @@ test("normalization is bounded and drops missing title or URL", () => {
   assert.equal(normalizeItem(raw({ url: null })), undefined);
 });
 
+test("normalization canonicalizes publication times and infers dates from article URLs", () => {
+  const explicit = normalizeItem(raw({ publishedAt: "2026-08-28 08:00:00+08:00" }))!;
+  assert.equal(explicit.publishedAt, "2026-08-28T00:00:00.000Z");
+  const inferred = normalizeItem(raw({ publishedAt: null, url: "https://tech.example.com/2026/07/24/article" }))!;
+  assert.equal(inferred.publishedAt, "2026-07-24T00:00:00.000Z");
+  const invalid = normalizeItem(raw({ publishedAt: "not-a-date" }))!;
+  assert.equal(invalid.publishedAt, null);
+});
+
+test("normalization preserves non-negative popularity signals", () => {
+  const item = normalizeItem(raw({ signals: { stars: 123.4, forks: -1, comments: 8 } }))!;
+  assert.deepEqual(item.signals, { stars: 123, comments: 8 });
+});
+
 test("dedupe prioritizes source external ID, then canonical URL", () => {
   const first = normalizeItem(raw())!;
   const sameExternal = normalizeItem(raw({ url: "https://example.com/other", excerpt: "other" }))!;

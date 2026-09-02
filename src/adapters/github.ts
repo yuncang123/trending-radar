@@ -8,6 +8,8 @@ interface GitHubRepository {
   html_url: string;
   description: string | null;
   updated_at: string;
+  stargazers_count?: number;
+  forks_count?: number;
   owner?: { login?: string };
 }
 
@@ -48,7 +50,20 @@ export class GitHubAdapter implements SourceAdapter {
       const verification = { reachable: true, status: 200, sourceRef: "https://api.github.com/search/repositories", checkedAt: retrievedAt, parserVersion: this.parserVersion };
       let droppedCount = 0;
       const items = repositories.flatMap((repository) => {
-        const item = normalizeItem({ sourceId: source.sourceId, sourceKind: this.kind, title: repository.full_name, url: repository.html_url, externalId: repository.id, publishedAt: repository.updated_at, author: repository.owner?.login ?? null, excerpt: repository.description, retrievedAt, parserVersion: this.parserVersion, verification });
+        const item = normalizeItem({
+          sourceId: source.sourceId,
+          sourceKind: this.kind,
+          title: repository.full_name,
+          url: repository.html_url,
+          externalId: repository.id,
+          publishedAt: repository.updated_at,
+          author: repository.owner?.login ?? null,
+          excerpt: repository.description,
+          signals: { stars: repository.stargazers_count, forks: repository.forks_count },
+          retrievedAt,
+          parserVersion: this.parserVersion,
+          verification
+        });
         if (!item) droppedCount += 1;
         return item ? [item] : [];
       });

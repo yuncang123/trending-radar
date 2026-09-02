@@ -2,7 +2,7 @@ import { normalizeItem } from "../normalize.js";
 import type { FetchContext, SourceAdapter, SourceBatch, SourceConfig, SourceFailure } from "../types.js";
 import { cancelled, errorFailure, failure, httpFailure } from "./shared.js";
 
-interface HnItem { id: number; title?: string; url?: string; by?: string; time?: number; text?: string; type?: string }
+interface HnItem { id: number; title?: string; url?: string; by?: string; time?: number; text?: string; type?: string; score?: number; descendants?: number }
 interface AlgoliaHit { objectID?: string; title?: string; url?: string | null; author?: string; created_at?: string; story_text?: string | null; points?: number | null; num_comments?: number | null }
 
 const MODES = new Set(["topstories", "newstories", "beststories", "askstories", "showstories"]);
@@ -55,6 +55,7 @@ export class HackerNewsAdapter implements SourceAdapter {
           publishedAt: hit.created_at ?? null,
           author: hit.author ?? null,
           excerpt: hit.story_text ?? facts,
+          signals: { points: hit.points ?? undefined, comments: hit.num_comments ?? undefined },
           retrievedAt,
           parserVersion: this.parserVersion,
           verification
@@ -98,7 +99,20 @@ export class HackerNewsAdapter implements SourceAdapter {
           return failure(source.sourceId, "parse", "INVALID_JSON", `Hacker News item ${id} returned invalid JSON.`, false, context.now());
         }
         if (!value || value.type !== "story") { droppedCount += 1; continue; }
-        const item = normalizeItem({ sourceId: source.sourceId, sourceKind: this.kind, title: value.title, url: value.url ?? `https://news.ycombinator.com/item?id=${value.id}`, externalId: value.id, publishedAt: value.time ? new Date(value.time * 1000).toISOString() : null, author: value.by ?? null, excerpt: value.text ?? "", retrievedAt, parserVersion: this.parserVersion, verification });
+        const item = normalizeItem({
+          sourceId: source.sourceId,
+          sourceKind: this.kind,
+          title: value.title,
+          url: value.url ?? `https://news.ycombinator.com/item?id=${value.id}`,
+          externalId: value.id,
+          publishedAt: value.time ? new Date(value.time * 1000).toISOString() : null,
+          author: value.by ?? null,
+          excerpt: value.text ?? "",
+          signals: { points: value.score, comments: value.descendants },
+          retrievedAt,
+          parserVersion: this.parserVersion,
+          verification
+        });
         if (item) items.push(item); else droppedCount += 1;
       }
       if (items.length === 0) return failure(source.sourceId, "verify", "EMPTY_RESULT", `Hacker News returned no usable stories; dropped ${droppedCount}.`, false, retrievedAt);

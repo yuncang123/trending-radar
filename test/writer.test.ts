@@ -17,7 +17,24 @@ test("writer scores topics, sorts deterministically, and applies maxItems", () =
   const input = [item("z", "Older software", "2026-08-28T00:00:00Z"), item("a", "New open source", "2026-08-29T00:00:00Z"), item("b", "Newest software", "2026-08-29T00:00:00Z", "open source tooling")];
   const selected = selectTrendItems(input, ["software", "open source"], { maxItems: 2 });
   assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["b", "a"]);
-  assert.deepEqual(selected.selection, { candidateCount: 3, selectedCount: 2, maxItems: 2, requireTopicMatch: false });
+  assert.deepEqual(selected.selection, {
+    candidateCount: 3,
+    selectedCount: 2,
+    maxItems: 2,
+    requireTopicMatch: false,
+    filterStats: {
+      maxAgeHours: 336,
+      collectedCount: 3,
+      qualityPassedCount: 3,
+      freshnessPassedCount: 3,
+      topicMatchedCount: 3,
+      topicPassedCount: 3,
+      exclusionPassedCount: 3,
+      effectiveCandidateCount: 3,
+      unknownPublishedAtCount: 0,
+      staleDroppedCount: 0
+    }
+  });
   assert.deepEqual(selectTrendItems(input, ["software"], { maxItems: 50 }).items.map((entry) => entry.sourceId), ["b", "z", "a"]);
 });
 
@@ -25,6 +42,35 @@ test("requireTopicMatch excludes non-matching items and puts null dates last", (
   const selected = selectTrendItems([item("a", "No match", null), item("b", "Software update", null), item("c", "Software today", "2026-08-29T00:00:00Z")], ["software"], { requireTopicMatch: true });
   assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["c", "b"]);
   assert.equal(selected.selection.candidateCount, 3);
+});
+
+test("freshness filtering reports effective candidates and stale items", () => {
+  const selected = selectTrendItems([
+    item("fresh", "AI fresh", "2026-08-29T00:00:00Z"),
+    item("stale", "AI stale", "2026-08-27T00:00:00Z"),
+    item("unknown", "AI unknown", null)
+  ], ["AI"], { maxAgeHours: 24, requireTopicMatch: true });
+  assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["fresh", "unknown"]);
+  assert.deepEqual(selected.selection.filterStats, {
+    maxAgeHours: 24,
+    collectedCount: 3,
+    qualityPassedCount: 3,
+    freshnessPassedCount: 2,
+    topicMatchedCount: 2,
+    topicPassedCount: 2,
+    exclusionPassedCount: 2,
+    effectiveCandidateCount: 2,
+    unknownPublishedAtCount: 1,
+    staleDroppedCount: 1
+  });
+});
+
+test("popularity signals break equal-topic ties", () => {
+  const selected = selectTrendItems([
+    { ...item("low", "AI project", "2026-08-29T00:00:00Z"), signals: { stars: 10 } },
+    { ...item("high", "AI project", "2026-08-29T00:00:00Z"), signals: { stars: 1000 } }
+  ], ["AI"], { maxItems: 1 });
+  assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["high"]);
 });
 
 test("source IDs do not create false topic matches", () => {

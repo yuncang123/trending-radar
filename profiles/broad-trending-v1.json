@@ -25,13 +25,14 @@
     { "sourceId": "global-hn-top", "label": "Hacker News Top", "kind": "hn", "enabled": true, "mode": "topstories", "limit": 10 },
     { "sourceId": "cn-google-news-ai", "label": "Google News 聚合：AI / 大模型 / Agent", "kind": "rss", "enabled": true, "url": "https://news.google.com/rss/search?q=%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD+OR+%E5%A4%A7%E6%A8%A1%E5%9E%8B+OR+%22AI+Agent%22&hl=zh-CN&gl=CN&ceid=CN:zh-Hans", "limit": 20 }
   ],
-  "topics": ["AI", "Agent", "MCP", "大模型", "LLM", "machine learning", "机器学习", "open source", "开源", "developer tools", "开发工具", "product", "产品", "robotics", "机器人", "芯片"],
+  "topics": ["AI", "Agent", "MCP", "大模型", "LLM", "machine learning", "机器学习", "open source", "开源", "developer tools", "开发工具", "product", "产品", "robotics", "机器人", "芯片", "Claude", "Fable", "Mythos", "Astra", "Qwen", "DeepSeek", "LongCat", "Gemini", "GPT", "OpenAI", "Anthropic", "Hugging Face", "RAG", "多模态", "推理模型", "世界模型", "AI safety", "网络安全", "智谱", "豆包", "通义", "混元"],
   "filter": {
     "maxItems": 50,
     "requireTopicMatch": true,
     "reuseMaxAgeMinutes": 0,
     "excludeLowQuality": true,
     "rejectFuturePublishedAt": true,
+    "maxAgeHours": 336,
     "excludeKeywords": ["家庭饮品", "奶昔", "制糖工厂", "伴手礼", "物种", "grindr", "steam leak", "microcar"],
     "sections": [
       {

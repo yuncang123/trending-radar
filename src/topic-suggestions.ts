@@ -1,4 +1,4 @@
-export type TopicSuggestionGroupId = "ai" | "development" | "industry";
+export type TopicSuggestionGroupId = "ai" | "models-and-companies" | "development" | "industry";
 
 export interface TopicSuggestionGroup {
   id: TopicSuggestionGroupId;
@@ -9,6 +9,10 @@ export const TOPIC_SUGGESTION_GROUPS: readonly TopicSuggestionGroup[] = [
   {
     id: "ai",
     topics: ["AI", "Agent", "MCP", "大模型", "LLM", "机器学习", "machine learning", "RAG", "多模态", "推理模型", "具身智能"]
+  },
+  {
+    id: "models-and-companies",
+    topics: ["Claude", "Fable", "Mythos", "Astra", "Qwen", "DeepSeek", "LongCat", "Gemini", "GPT", "OpenAI", "Anthropic", "Hugging Face", "智谱", "豆包", "通义", "混元"]
   },
   {
     id: "development",

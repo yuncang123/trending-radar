@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { NormalizedItem, SourceKind, Verification } from "./types.js";
+import type { NormalizedItem, SourceKind, TrendSignals, Verification } from "./types.js";
 
 const TRACKING_PARAMS = new Set(["fbclid", "gclid", "mc_cid", "mc_eid"]);
 const MAX_EXCERPT_LENGTH = 500;
@@ -17,6 +17,31 @@ export interface RawItem {
   retrievedAt: string;
   parserVersion: string;
   verification: Verification;
+  signals?: TrendSignals;
+}
+
+function inferPublishedAt(value: string | null | undefined, url: string): string | null {
+  if (value) {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
+  }
+  const match = url.match(/(?:^|\/)((?:20|19)\d{2})[\/-](\d{1,2})[\/-](\d{1,2})(?:[\/?#]|$)/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const inferred = new Date(Date.UTC(year, month - 1, day));
+  return inferred.getUTCFullYear() === year && inferred.getUTCMonth() === month - 1 && inferred.getUTCDate() === day
+    ? inferred.toISOString()
+    : null;
+}
+
+function normalizeSignals(value: TrendSignals | undefined): TrendSignals | undefined {
+  if (!value) return undefined;
+  const signals = Object.fromEntries((Object.entries(value) as [keyof TrendSignals, unknown][])
+    .filter(([, entry]) => typeof entry === "number" && Number.isFinite(entry) && entry >= 0)
+    .map(([key, entry]) => [key, Math.round(entry as number)])) as TrendSignals;
+  return Object.keys(signals).length > 0 ? signals : undefined;
 }
 
 export function canonicalizeUrl(value: string): string {
@@ -48,19 +73,21 @@ export function normalizeItem(raw: RawItem): NormalizedItem | undefined {
   }
   const excerpt = compactText(raw.excerpt);
   const contentHash = createHash("sha256").update(`${title}\n${url}\n${excerpt}`).digest("hex");
+  const signals = normalizeSignals(raw.signals);
   return {
     sourceId: raw.sourceId,
     sourceKind: raw.sourceKind,
     title,
     url,
     externalId: raw.externalId === null || raw.externalId === undefined ? null : String(raw.externalId),
-    publishedAt: raw.publishedAt ?? null,
+    publishedAt: inferPublishedAt(raw.publishedAt, url),
     author: raw.author ? compactText(raw.author, 200) : null,
     excerpt,
     contentHash,
     retrievedAt: raw.retrievedAt,
     parserVersion: raw.parserVersion,
-    verification: raw.verification
+    verification: raw.verification,
+    ...(signals ? { signals } : {})
   };
 }
 

@@ -56,6 +56,7 @@ test("validates optional freshness, quality, and section matching settings", () 
     ...valid,
     filter: {
       reuseMaxAgeMinutes: 0,
+      maxAgeHours: 336,
       excludeLowQuality: true,
       rejectFuturePublishedAt: true,
       excludeKeywords: ["游戏"],
@@ -66,7 +67,9 @@ test("validates optional freshness, quality, and section matching settings", () 
   });
   assert.equal(parsed.filter.reuseMaxAgeMinutes, 0);
   assert.equal(parsed.filter.excludeLowQuality, true);
+  assert.equal(parsed.filter.maxAgeHours, 336);
   assert.throws(() => parseProfile({ ...valid, filter: { reuseMaxAgeMinutes: -1 } }), /reuseMaxAgeMinutes/);
   assert.throws(() => parseProfile({ ...valid, filter: { excludeKeywords: [1] } }), /excludeKeywords/);
   assert.throws(() => parseProfile({ ...valid, filter: { backfill: "yes" } }), /backfill/);
+  assert.throws(() => parseProfile({ ...valid, filter: { maxAgeHours: 0 } }), /maxAgeHours/);
 });

@@ -1,7 +1,8 @@
 import { isLowQualityExcerpt } from "./normalize.js";
-import type { DraftInput, DraftSectionSelection, NormalizedItem, SourceFailure, WriterOutput } from "./types.js";
+import type { DraftInput, DraftSectionSelection, FilterStats, NormalizedItem, SourceFailure, WriterOutput } from "./types.js";
 
 const DEFAULT_MAX_ITEMS = 50;
+const DEFAULT_MAX_AGE_HOURS = 14 * 24;
 
 function filterNumber(filter: Record<string, unknown>, key: string, fallback: number): number {
   const value = filter[key];
@@ -10,6 +11,11 @@ function filterNumber(filter: Record<string, unknown>, key: string, fallback: nu
 
 function requireTopicMatch(filter: Record<string, unknown>): boolean {
   return filter.requireTopicMatch === true;
+}
+
+function maxAgeHours(filter: Record<string, unknown>): number {
+  const value = filter.maxAgeHours;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : DEFAULT_MAX_AGE_HOURS;
 }
 
 interface SectionConfig {
@@ -91,9 +97,20 @@ function publishedTime(value: string | null, nowMs: number): number {
   return parsed;
 }
 
+function popularityScore(item: NormalizedItem): number {
+  const signals = item.signals;
+  if (!signals) return 0;
+  return Math.log1p(signals.points ?? 0) +
+    1.5 * Math.log1p(signals.stars ?? 0) +
+    0.5 * Math.log1p(signals.forks ?? 0) +
+    0.5 * Math.log1p(signals.comments ?? 0);
+}
+
 function compareItems(a: NormalizedItem, b: NormalizedItem, topics: string[], nowMs: number): number {
   const scoreDelta = topicScore(b, topics) - topicScore(a, topics);
   if (scoreDelta !== 0) return scoreDelta;
+  const popularityDelta = popularityScore(b) - popularityScore(a);
+  if (popularityDelta !== 0) return popularityDelta;
   const dateDelta = publishedTime(b.publishedAt, nowMs) - publishedTime(a.publishedAt, nowMs);
   if (dateDelta !== 0) return dateDelta;
   const sourceDelta = compareText(a.sourceId, b.sourceId);
@@ -105,13 +122,20 @@ function compareItems(a: NormalizedItem, b: NormalizedItem, topics: string[], no
 
 export function selectTrendItems(items: NormalizedItem[], topics: string[], filter: Record<string, unknown>): { items: NormalizedItem[]; selection: DraftInput["selection"] } {
   const maxItems = filterNumber(filter, "maxItems", DEFAULT_MAX_ITEMS);
+  const freshnessWindow = maxAgeHours(filter);
   const mustMatch = requireTopicMatch(filter);
   const retrievedTimes = items.map((item) => Date.parse(item.retrievedAt)).filter((value) => Number.isFinite(value));
   const nowMs = retrievedTimes.length > 0 ? Math.max(...retrievedTimes) : Date.now();
   const excludedKeywords = Array.isArray(filter.excludeKeywords) ? filter.excludeKeywords.filter((value): value is string => typeof value === "string" && value.trim() !== "").map((value) => value.toLowerCase()) : [];
   const qualityFiltered = items.filter((item) => filter.excludeLowQuality !== true || !isLowQualityExcerpt(item.excerpt));
   const dateFiltered = qualityFiltered.filter((item) => filter.rejectFuturePublishedAt !== true || publishedTime(item.publishedAt, nowMs) !== Number.NEGATIVE_INFINITY || !item.publishedAt);
-  const topicFiltered = mustMatch && topics.length > 0 ? dateFiltered.filter((item) => topicScore(item, topics) > 0) : dateFiltered;
+  const freshnessFiltered = dateFiltered.filter((item) => {
+    if (!item.publishedAt) return true;
+    const published = publishedTime(item.publishedAt, nowMs);
+    return published === Number.NEGATIVE_INFINITY || nowMs - published <= freshnessWindow * 60 * 60 * 1000;
+  });
+  const topicMatches = topics.length > 0 ? freshnessFiltered.filter((item) => topicScore(item, topics) > 0) : freshnessFiltered;
+  const topicFiltered = mustMatch && topics.length > 0 ? topicMatches : freshnessFiltered;
   const candidates = topicFiltered.filter((item) => !excludedKeywords.some((keyword) => textIncludesKeyword(itemText(item), keyword)));
   const ranked = [...candidates].sort((a, b) => compareItems(a, b, topics, nowMs));
   const sections = sectionConfigs(filter);
@@ -119,8 +143,20 @@ export function selectTrendItems(items: NormalizedItem[], topics: string[], filt
   // trends; their order, caps, exploration, and backfill flags never displace
   // a higher-ranked item from another section.
   const selected = ranked.slice(0, maxItems);
+  const filterStats: FilterStats = {
+    maxAgeHours: freshnessWindow,
+    collectedCount: items.length,
+    qualityPassedCount: qualityFiltered.length,
+    freshnessPassedCount: freshnessFiltered.length,
+    topicMatchedCount: topicMatches.length,
+    topicPassedCount: topicFiltered.length,
+    exclusionPassedCount: candidates.length,
+    effectiveCandidateCount: candidates.length,
+    unknownPublishedAtCount: freshnessFiltered.filter((item) => !item.publishedAt).length,
+    staleDroppedCount: dateFiltered.length - freshnessFiltered.length
+  };
   if (sections.length === 0) {
-    return { items: selected, selection: { candidateCount: items.length, selectedCount: selected.length, maxItems, requireTopicMatch: mustMatch } };
+    return { items: selected, selection: { candidateCount: items.length, selectedCount: selected.length, maxItems, requireTopicMatch: mustMatch, filterStats } };
   }
 
   const sectionSelections: DraftSectionSelection[] = sections.map((section) => ({
@@ -151,6 +187,7 @@ export function selectTrendItems(items: NormalizedItem[], topics: string[], filt
       selectedCount: selected.length,
       maxItems,
       requireTopicMatch: mustMatch,
+      filterStats,
       sections: sectionSelections
     }
   };
@@ -186,11 +223,13 @@ function failureLine(failure: SourceFailure): string {
 function itemBlock(item: NormalizedItem, index: number, headingLevel = 3): string {
   const published = item.publishedAt ? safeText(item.publishedAt) : "unknown";
   const verification = `reachable=${item.verification.reachable}; status=${item.verification.status ?? "unknown"}; checked=${safeText(item.verification.checkedAt)}`;
+  const signals = item.signals ? Object.entries(item.signals).map(([key, value]) => `${key}=${value}`).join(", ") : "none";
   return [
     `${"#".repeat(headingLevel)} ${index}. ${safeText(item.title)}`,
     `- Link: <${item.url}>`,
     `- Source: \`${safeText(item.sourceId)}\``,
     `- Published: ${published}`,
+    `- Popularity: ${signals}`,
     `- Excerpt: ${safeText(item.excerpt) || "(none)"}`,
     `- Verification: ${verification}`,
     ""
@@ -235,6 +274,9 @@ export function renderTemplateDraft(input: DraftInput): WriterOutput {
     `- Run: \`${input.runId}\``,
     `- Profile: \`${input.profileId}\` / \`${input.profileVersion}\``,
     `- Candidates: ${input.selection.candidateCount}; selected: ${input.selection.selectedCount}; maxItems: ${input.selection.maxItems}`,
+    ...(input.selection.filterStats ? [
+      `- Effective candidates: ${input.selection.filterStats.effectiveCandidateCount}; after freshness: ${input.selection.filterStats.freshnessPassedCount}; topic matched: ${input.selection.filterStats.topicMatchedCount}; topic passed: ${input.selection.filterStats.topicPassedCount}; stale dropped: ${input.selection.filterStats.staleDroppedCount}; unknown published: ${input.selection.filterStats.unknownPublishedAtCount}; max age: ${input.selection.filterStats.maxAgeHours}h`
+    ] : []),
     `- Topics: ${input.topics.length > 0 ? input.topics.map((topic) => `\`${safeText(topic)}\``).join(", ") : "none"}`,
     "",
     "## Source failures",
@@ -255,6 +297,7 @@ export function appendFactAppendix(input: DraftInput, markdown: string): string 
     `- Status: ${input.status}`,
     `- Profile: ${input.profileId} / ${input.profileVersion}`,
     `- Candidates: ${input.selection.candidateCount}; selected: ${input.selection.selectedCount}`,
+    ...(input.selection.filterStats ? [`- Filter stats: ${JSON.stringify(input.selection.filterStats)}`] : []),
     `- Topics: ${input.topics.length > 0 ? input.topics.map(safeText).join(", ") : "none"}`,
     ...(input.selection.sections ?? []).map((section) => `- Section: ${safeText(section.sectionId)} | ${safeText(section.label)} | selected=${section.selectedCount} | max=${section.maxItems}`),
     ...input.items.map((item) => `- Item: ${safeText(item.sourceId)} | ${safeText(item.title)} | ${item.url}`),
