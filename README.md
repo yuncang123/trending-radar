@@ -16,7 +16,7 @@ The settings page also supports an optional Anthropic-compatible Writer request.
 
 Next to `Model ID`, use `Refresh` to load model IDs from the configured Provider's `GET /v1/models` endpoint. The field remains editable and supports autocomplete. `Verify` sends a tiny fixed Messages request for the current model and reports whether that model returned usable text; this is a reachability check, not a quality or pricing guarantee. The model list is kept in memory only and is cleared when the key or base URL changes.
 
-Start from `profiles/example.json`, or create a Profile from the settings page and add custom public sources. Provider secrets do not belong in a shared Profile. Scheduling and publishing are outside this plugin.
+Start from `profiles/example.json`, or create a Profile from the settings page. A newly created Profile is seeded with the 21-source broad catalog; an existing empty Profile can use `Add recommended sources` to restore it without replacing custom sources. Provider secrets do not belong in a shared Profile. Scheduling and publishing are outside this plugin.
 
 For a usable Chinese technology baseline, start from `profiles/chinese-tech-v2.json`. It enables ten
 direct public RSS feeds (少数派、Solidot、InfoQ 中文、量子位、开源中国、博客园、IT之家、美团技术团队、阮一峰科技爱好者周刊、爱范儿)

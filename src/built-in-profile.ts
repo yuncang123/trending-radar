@@ -1,0 +1,73 @@
+/**
+ * Community releases contain only manifest.json, main.js, and styles.css.
+ * Keep the usable default Profile in TypeScript so esbuild embeds it in main.js.
+ * profiles/broad-trending-v1.json remains the human-readable release source.
+ */
+export const BUILT_IN_DEFAULT_PROFILE_INPUT = {
+  profileId: "default",
+  version: "v1",
+  outputDirectory: "Trending Radar",
+  sources: [
+    { sourceId: "cn-sspai", label: "少数派", kind: "rss", enabled: true, url: "https://sspai.com/feed", limit: 10 },
+    { sourceId: "cn-solidot", label: "Solidot 奇客", kind: "rss", enabled: true, url: "https://www.solidot.org/index.rss", limit: 10 },
+    { sourceId: "cn-infoq", label: "InfoQ 中文", kind: "rss", enabled: true, url: "https://www.infoq.cn/feed", limit: 10 },
+    { sourceId: "cn-qbitai", label: "量子位", kind: "rss", enabled: true, url: "https://www.qbitai.com/feed", limit: 10 },
+    { sourceId: "cn-oschina", label: "开源中国", kind: "rss", enabled: true, url: "https://www.oschina.net/news/rss", limit: 10 },
+    { sourceId: "cn-cnblogs", label: "博客园", kind: "rss", enabled: true, url: "https://feed.cnblogs.com/blog/sitehome/rss", limit: 10 },
+    { sourceId: "cn-ithome", label: "IT之家", kind: "rss", enabled: true, url: "https://www.ithome.com/rss/", limit: 10 },
+    { sourceId: "cn-meituan-tech", label: "美团技术团队", kind: "rss", enabled: true, url: "https://tech.meituan.com/feed/", limit: 10 },
+    { sourceId: "cn-ruanyifeng-weekly", label: "阮一峰科技爱好者周刊", kind: "rss", enabled: true, url: "https://www.ruanyifeng.com/blog/atom.xml", limit: 10 },
+    { sourceId: "cn-ifanr", label: "爱范儿", kind: "rss", enabled: true, url: "https://www.ifanr.com/feed", limit: 10 },
+    { sourceId: "cn-segmentfault", label: "SegmentFault 思否", kind: "rss", enabled: true, url: "https://segmentfault.com/feeds", limit: 10 },
+    { sourceId: "global-lobsters", label: "Lobsters", kind: "rss", enabled: true, url: "https://lobste.rs/rss", limit: 10 },
+    { sourceId: "global-openai-blog", label: "OpenAI Blog", kind: "rss", enabled: true, url: "https://openai.com/blog/rss.xml", limit: 10 },
+    { sourceId: "global-techcrunch", label: "TechCrunch", kind: "rss", enabled: true, url: "https://techcrunch.com/feed/", limit: 10 },
+    { sourceId: "global-verge", label: "The Verge", kind: "rss", enabled: true, url: "https://www.theverge.com/rss/index.xml", limit: 10 },
+    { sourceId: "global-ars", label: "Ars Technica", kind: "rss", enabled: true, url: "https://feeds.arstechnica.com/arstechnica/index", limit: 10 },
+    { sourceId: "research-arxiv-cs-ai", label: "arXiv cs.AI", kind: "rss", enabled: true, url: "https://export.arxiv.org/api/query?search_query=cat%3Acs.AI&start=0&max_results=10&sortBy=submittedDate&sortOrder=descending", limit: 10 },
+    { sourceId: "research-arxiv-cs-lg", label: "arXiv cs.LG", kind: "rss", enabled: true, url: "https://export.arxiv.org/api/query?search_query=cat%3Acs.LG&start=0&max_results=10&sortBy=submittedDate&sortOrder=descending", limit: 10 },
+    { sourceId: "global-github-ai", label: "GitHub AI repositories", kind: "github", enabled: true, query: "topic:ai stars:>100", sort: "stars", order: "desc", limit: 10, pages: 1 },
+    { sourceId: "global-hn-top", label: "Hacker News Top", kind: "hn", enabled: true, mode: "topstories", limit: 10 },
+    { sourceId: "cn-google-news-ai", label: "Google News 聚合：AI / 大模型 / Agent", kind: "rss", enabled: true, url: "https://news.google.com/rss/search?q=%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD+OR+%E5%A4%A7%E6%A8%A1%E5%9E%8B+OR+%22AI+Agent%22&hl=zh-CN&gl=CN&ceid=CN:zh-Hans", limit: 20 }
+  ],
+  topics: ["AI", "Agent", "MCP", "大模型", "LLM", "machine learning", "机器学习", "open source", "开源", "developer tools", "开发工具", "product", "产品", "robotics", "机器人", "芯片"],
+  filter: {
+    maxItems: 50,
+    requireTopicMatch: true,
+    reuseMaxAgeMinutes: 0,
+    excludeLowQuality: true,
+    rejectFuturePublishedAt: true,
+    excludeKeywords: ["家庭饮品", "奶昔", "制糖工厂", "伴手礼", "物种", "grindr", "steam leak", "microcar"],
+    sections: [
+      {
+        sectionId: "open-source-and-developers",
+        label: "开源与开发",
+        maxItems: 16,
+        sourceIds: ["cn-solidot", "cn-oschina", "cn-cnblogs", "cn-meituan-tech", "cn-ruanyifeng-weekly", "cn-segmentfault", "global-lobsters", "global-github-ai", "global-hn-top"],
+        keywords: ["open source", "开源", "github", "repository", "developer", "开发", "sdk", "api", "framework", "tool", "工具", "coding", "代码", "编程", "runtime", "harness", "mcp"]
+      },
+      {
+        sectionId: "ai-frontier",
+        label: "AI 前沿",
+        maxItems: 14,
+        sourceIds: ["cn-infoq", "cn-qbitai", "global-openai-blog", "research-arxiv-cs-ai", "research-arxiv-cs-lg"],
+        keywords: ["ai", "大模型", "llm", "agent", "mcp", "machine learning", "机器学习", "模型", "具身", "机器人", "robotics", "gpu", "芯片", "ocr", "harness"]
+      },
+      {
+        sectionId: "products-and-industry",
+        label: "产品与产业",
+        maxItems: 15,
+        sourceIds: ["cn-sspai", "cn-ithome", "cn-ifanr", "global-techcrunch", "global-verge", "global-ars"],
+        keywords: ["product", "产品", "startup", "融资", "ipo", "商业", "产业", "app", "应用", "平台", "企业", "cloud", "芯片", "robotaxi", "汽车"],
+        excludeKeywords: ["家庭饮品", "奶昔", "制糖工厂", "伴手礼", "物种", "grindr", "steam leak", "microcar"]
+      },
+      {
+        sectionId: "media-and-discovery",
+        label: "媒体与发现",
+        maxItems: 5,
+        sourceIds: ["cn-google-news-ai"]
+      }
+    ]
+  },
+  templateId: "sectioned-v1"
+};

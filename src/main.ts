@@ -114,15 +114,7 @@ export default class TrendingRadarPlugin extends Plugin {
     let leaseStore: VaultLedgerStore | null = null;
     try {
       const profile = await this.loadProfile();
-      const effectiveProfile: Profile = profile ?? parseProfile({
-        profileId: "default",
-        version: "v1",
-        outputDirectory: this.settings.outputDirectory,
-        sources: [],
-        topics: [],
-        filter: {},
-        templateId: "default"
-      });
+      const effectiveProfile: Profile = profile ?? createDefaultProfile(this.settings.outputDirectory);
       const store = new VaultLedgerStore(this.app.vault.adapter, effectiveProfile.outputDirectory);
       leaseStore = store;
       const currentRunId = runId();
@@ -426,15 +418,7 @@ export default class TrendingRadarPlugin extends Plugin {
     const startedAt = Date.now();
     try {
       const profile = await this.loadProfile();
-      const effectiveProfile: Profile = profile ?? parseProfile({
-        profileId: "default",
-        version: "v1",
-        outputDirectory: this.settings.outputDirectory,
-        sources: [],
-        topics: [],
-        filter: {},
-        templateId: "default"
-      });
+      const effectiveProfile: Profile = profile ?? createDefaultProfile(this.settings.outputDirectory);
       const store = new VaultLedgerStore(this.app.vault.adapter, effectiveProfile.outputDirectory);
       const latest = await store.loadLatestLedger();
       if (!latest) {
@@ -551,15 +535,7 @@ export default class TrendingRadarPlugin extends Plugin {
     this.showRunNotice(this.translate("notice_external_checking"));
     try {
       const profile = await this.loadProfile();
-      const effectiveProfile: Profile = profile ?? parseProfile({
-        profileId: "default",
-        version: "v1",
-        outputDirectory: this.settings.outputDirectory,
-        sources: [],
-        topics: [],
-        filter: {},
-        templateId: "default"
-      });
+      const effectiveProfile: Profile = profile ?? createDefaultProfile(this.settings.outputDirectory);
       const store = new VaultLedgerStore(this.app.vault.adapter, effectiveProfile.outputDirectory);
       const latest = await store.loadLatestLedger();
       if (!latest) {
