@@ -1,3 +1,4 @@
+import { BUILT_IN_DEFAULT_PROFILE_INPUT } from "./built-in-profile.js";
 import { parseProfile } from "./profile.js";
 import type { Profile } from "./types.js";
 
@@ -5,13 +6,8 @@ export const DEFAULT_PROFILE_PATH = "trending-radar-profile.json";
 
 export function createDefaultProfile(outputDirectory: string): Profile {
   return parseProfile({
-    profileId: "default",
-    version: "v1",
+    ...BUILT_IN_DEFAULT_PROFILE_INPUT,
     outputDirectory,
-    sources: [],
-    topics: [],
-    filter: { maxItems: 50, requireTopicMatch: false },
-    templateId: "default"
   });
 }
 

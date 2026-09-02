@@ -1,6 +1,7 @@
 import { Modal, Notice, PluginSettingTab, Setting, setIcon, type App } from "obsidian";
 import type TrendingRadarPlugin from "./main.js";
 import { SOURCE_KINDS, type Profile, type SourceConfig, type SourceKind } from "./types.js";
+import { createDefaultProfile } from "./profile-editor.js";
 import type { TranslationKey, Translator } from "./i18n.js";
 import { captureScrollPosition, restoreScrollPosition, type ScrollPositionSnapshot } from "./settings-scroll.js";
 import { availableTopicSuggestionGroups, type TopicSuggestionGroupId } from "./topic-suggestions.js";
@@ -358,7 +359,20 @@ export class TrendingRadarSettingTab extends PluginSettingTab {
     disableAll.createSpan({ text: this.t("disable_all") });
     disableAll.addEventListener("click", () => void this.changeProfile((draft) => { draft.sources = draft.sources.map((source) => ({ ...source, enabled: false })); }));
 
-    if (profile.sources.length === 0) section.createDiv({ cls: "trending-radar-empty", text: this.t("no_sources") });
+    if (profile.sources.length === 0) {
+      const empty = section.createDiv({ cls: "trending-radar-empty" });
+      empty.createDiv({ text: this.t("no_sources") });
+      const seed = empty.createEl("button", { cls: "mod-cta" });
+      setIcon(seed, "library-big");
+      seed.createSpan({ text: this.t("add_recommended_sources") });
+      seed.addEventListener("click", () => void this.changeProfile((draft) => {
+        const recommended = createDefaultProfile(draft.outputDirectory);
+        draft.sources.push(...recommended.sources);
+        if (draft.topics.length === 0) draft.topics = [...recommended.topics];
+        if (!draft.filter.sections) draft.filter = { ...recommended.filter, ...draft.filter, sections: recommended.filter.sections };
+        if (draft.templateId === "default") draft.templateId = recommended.templateId;
+      }));
+    }
     for (const group of SOURCE_GROUPS) {
       const sources = profile.sources.filter((source) => group.kinds.includes(source.kind));
       if (sources.length === 0) continue;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
+import { createDefaultProfile } from "../src/profile-editor.js";
 import { parseProfile } from "../src/profile.js";
 
 const sourcePackPath = resolve("profiles/chinese-tech-v2.json");
@@ -91,4 +92,15 @@ test("broad trending profile combines all source families into one sectioned run
   assert.equal(profile.filter.maxItemsPerSource, undefined);
   assert.equal(profile.templateId, "sectioned-v1");
   assert.equal(/api.?key|authorization|credential|password|token/i.test(raw), false);
+});
+
+test("the community-install default stays aligned with the broad release Profile", () => {
+  const broad = parseProfile(JSON.parse(readFileSync(resolve("profiles/broad-trending-v1.json"), "utf8")));
+  const builtIn = createDefaultProfile("Custom Output");
+
+  assert.equal(builtIn.outputDirectory, "Custom Output");
+  assert.deepEqual(builtIn.sources, broad.sources);
+  assert.deepEqual(builtIn.topics, broad.topics);
+  assert.deepEqual(builtIn.filter, broad.filter);
+  assert.equal(builtIn.templateId, broad.templateId);
 });

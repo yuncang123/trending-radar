@@ -3,6 +3,19 @@ import test from "node:test";
 import { createDefaultProfile, reviseProfile } from "../src/profile-editor.js";
 import { validateVaultRelativePath } from "../src/profile.js";
 
+test("a fresh community-install Profile includes the broad selectable source catalog", () => {
+  const profile = createDefaultProfile("Community Radar");
+
+  assert.equal(profile.outputDirectory, "Community Radar");
+  assert.equal(profile.sources.length, 21);
+  assert.equal(profile.sources.filter((source) => source.enabled).length, 21);
+  assert.ok(profile.sources.some((source) => source.sourceId === "cn-sspai"));
+  assert.ok(profile.sources.some((source) => source.sourceId === "global-github-ai"));
+  assert.ok(profile.sources.some((source) => source.sourceId === "global-hn-top"));
+  assert.ok(profile.sources.some((source) => source.sourceId === "research-arxiv-cs-ai"));
+  assert.equal(profile.templateId, "sectioned-v1");
+});
+
 test("revising a Profile preserves extension fields and increments vN versions", () => {
   const profile = {
     ...createDefaultProfile("Trending Radar"),
@@ -15,7 +28,9 @@ test("revising a Profile preserves extension fields and increments vN versions",
   }, new Date("2026-08-29T05:00:00Z"));
   assert.equal(revised.version, "v6");
   assert.deepEqual(revised.topics, ["software", "open source"]);
-  assert.deepEqual(revised.filter, { maxItems: 25, requireTopicMatch: false });
+  assert.equal(revised.filter.maxItems, 25);
+  assert.equal(revised.filter.requireTopicMatch, true);
+  assert.equal((revised.filter.sections as unknown[]).length, 4);
   assert.deepEqual((revised as unknown as Record<string, unknown>).extension, { owner: "community" });
 });
 
