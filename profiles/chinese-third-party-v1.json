@@ -23,7 +23,11 @@
   "topics": ["AI", "Agent", "MCP", "大模型", "开发工具", "开源", "产品"],
   "filter": {
     "maxItems": 50,
-    "requireTopicMatch": false
+    "requireTopicMatch": false,
+    "requirePublishedAt": true,
+    "maxAgeHours": 24,
+    "aiMaxItems": 15,
+    "aiMinimumScore": 70
   },
   "templateId": "default"
 }

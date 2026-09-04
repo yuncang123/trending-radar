@@ -47,7 +47,7 @@ function validateSelectionFilter(filter: Record<string, unknown>): void {
       throw new Error(`filter.${key} must be an array of non-empty strings`);
     }
   }
-  for (const key of ["excludeLowQuality", "rejectFuturePublishedAt", "explorePerSection", "backfill"] as const) {
+  for (const key of ["excludeLowQuality", "rejectFuturePublishedAt", "requirePublishedAt", "explorePerSection", "backfill"] as const) {
     if (filter[key] !== undefined && typeof filter[key] !== "boolean") throw new Error(`filter.${key} must be boolean`);
   }
   if (filter.maxItemsPerSource !== undefined && (!Number.isInteger(filter.maxItemsPerSource) || Number(filter.maxItemsPerSource) <= 0)) {
@@ -55,6 +55,12 @@ function validateSelectionFilter(filter: Record<string, unknown>): void {
   }
   if (filter.maxAgeHours !== undefined && (!Number.isInteger(filter.maxAgeHours) || Number(filter.maxAgeHours) <= 0)) {
     throw new Error("filter.maxAgeHours must be a positive integer");
+  }
+  if (filter.aiMaxItems !== undefined && (!Number.isInteger(filter.aiMaxItems) || Number(filter.aiMaxItems) <= 0 || Number(filter.aiMaxItems) > 100)) {
+    throw new Error("filter.aiMaxItems must be an integer between 1 and 100");
+  }
+  if (filter.aiMinimumScore !== undefined && (!Number.isInteger(filter.aiMinimumScore) || Number(filter.aiMinimumScore) < 0 || Number(filter.aiMinimumScore) > 100)) {
+    throw new Error("filter.aiMinimumScore must be an integer between 0 and 100");
   }
   if (filter.sections === undefined) return;
   if (!Array.isArray(filter.sections)) throw new Error("filter.sections must be an array");

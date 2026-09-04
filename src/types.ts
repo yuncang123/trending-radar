@@ -125,6 +125,7 @@ export interface DraftSelection {
 
 export interface FilterStats {
   maxAgeHours: number;
+  requirePublishedAt?: boolean;
   collectedCount: number;
   qualityPassedCount: number;
   freshnessPassedCount: number;
@@ -133,6 +134,7 @@ export interface FilterStats {
   exclusionPassedCount: number;
   effectiveCandidateCount: number;
   unknownPublishedAtCount: number;
+  unknownPublishedAtDroppedCount?: number;
   staleDroppedCount: number;
 }
 

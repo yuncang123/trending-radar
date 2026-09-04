@@ -462,12 +462,25 @@ export class TrendingRadarSettingTab extends PluginSettingTab {
       .setDynamicTooltip()
       .setValue(maxItems)
        .onChange((value) => void this.changeProfile((draft) => { draft.filter = { ...draft.filter, maxItems: value }; }, false)));
-    const maxAgeHours = boundedInteger(profile.filter.maxAgeHours, 336, 24, 24 * 30);
+    const maxAgeHours = boundedInteger(profile.filter.maxAgeHours, 24, 24, 24 * 30);
     new Setting(section).setName(this.t("filter_max_age")).setDesc(this.t("filter_max_age_desc")).addSlider((slider) => slider
       .setLimits(24, 24 * 30, 24)
       .setDynamicTooltip()
       .setValue(maxAgeHours)
       .onChange((value) => void this.changeProfile((draft) => { draft.filter = { ...draft.filter, maxAgeHours: value }; }, false)));
+    new Setting(section).setName(this.t("filter_require_published_at")).setDesc(this.t("filter_require_published_at_desc")).addToggle((toggle) => toggle
+      .setValue(profile.filter.requirePublishedAt !== false)
+      .onChange((value) => void this.changeProfile((draft) => { draft.filter = { ...draft.filter, requirePublishedAt: value }; })));
+    const aiMaxItems = boundedInteger(profile.filter.aiMaxItems, 15, 1, 30);
+    new Setting(section).setName(this.t("filter_ai_max_items")).setDesc(this.t("filter_ai_max_items_desc")).addSlider((slider) => slider
+      .setLimits(1, 30, 1)
+      .setValue(aiMaxItems)
+      .onChange((value) => void this.changeProfile((draft) => { draft.filter = { ...draft.filter, aiMaxItems: value }; }, false)));
+    const aiMinimumScore = boundedInteger(profile.filter.aiMinimumScore, 70, 0, 100);
+    new Setting(section).setName(this.t("filter_ai_minimum_score")).setDesc(this.t("filter_ai_minimum_score_desc")).addSlider((slider) => slider
+      .setLimits(0, 100, 5)
+      .setValue(aiMinimumScore)
+      .onChange((value) => void this.changeProfile((draft) => { draft.filter = { ...draft.filter, aiMinimumScore: value }; }, false)));
     new Setting(section).setName(this.t("filter_require_topic")).setDesc(this.t("filter_require_topic_desc")).addToggle((toggle) => toggle
       .setValue(profile.filter.requireTopicMatch === true)
       .onChange((value) => void this.changeProfile((draft) => { draft.filter = { ...draft.filter, requireTopicMatch: value }; })));

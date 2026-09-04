@@ -37,7 +37,10 @@ export const BUILT_IN_DEFAULT_PROFILE_INPUT = {
     reuseMaxAgeMinutes: 0,
     excludeLowQuality: true,
     rejectFuturePublishedAt: true,
-    maxAgeHours: 336,
+    requirePublishedAt: true,
+    maxAgeHours: 24,
+    aiMaxItems: 15,
+    aiMinimumScore: 70,
     excludeKeywords: ["家庭饮品", "奶昔", "制糖工厂", "伴手礼", "物种", "grindr", "steam leak", "microcar"],
     sections: [
       {

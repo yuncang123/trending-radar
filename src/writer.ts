@@ -1,8 +1,9 @@
 import { isLowQualityExcerpt } from "./normalize.js";
+import type { AiItemScore } from "./ai-ranking.js";
 import type { DraftInput, DraftSectionSelection, FilterStats, NormalizedItem, SourceFailure, WriterOutput } from "./types.js";
 
 const DEFAULT_MAX_ITEMS = 50;
-const DEFAULT_MAX_AGE_HOURS = 14 * 24;
+const DEFAULT_MAX_AGE_HOURS = 24;
 
 function filterNumber(filter: Record<string, unknown>, key: string, fallback: number): number {
   const value = filter[key];
@@ -16,6 +17,10 @@ function requireTopicMatch(filter: Record<string, unknown>): boolean {
 function maxAgeHours(filter: Record<string, unknown>): number {
   const value = filter.maxAgeHours;
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : DEFAULT_MAX_AGE_HOURS;
+}
+
+function requirePublishedAt(filter: Record<string, unknown>): boolean {
+  return filter.requirePublishedAt !== false;
 }
 
 interface SectionConfig {
@@ -123,6 +128,7 @@ function compareItems(a: NormalizedItem, b: NormalizedItem, topics: string[], no
 export function selectTrendItems(items: NormalizedItem[], topics: string[], filter: Record<string, unknown>): { items: NormalizedItem[]; selection: DraftInput["selection"] } {
   const maxItems = filterNumber(filter, "maxItems", DEFAULT_MAX_ITEMS);
   const freshnessWindow = maxAgeHours(filter);
+  const mustHavePublishedAt = requirePublishedAt(filter);
   const mustMatch = requireTopicMatch(filter);
   const retrievedTimes = items.map((item) => Date.parse(item.retrievedAt)).filter((value) => Number.isFinite(value));
   const nowMs = retrievedTimes.length > 0 ? Math.max(...retrievedTimes) : Date.now();
@@ -130,7 +136,7 @@ export function selectTrendItems(items: NormalizedItem[], topics: string[], filt
   const qualityFiltered = items.filter((item) => filter.excludeLowQuality !== true || !isLowQualityExcerpt(item.excerpt));
   const dateFiltered = qualityFiltered.filter((item) => filter.rejectFuturePublishedAt !== true || publishedTime(item.publishedAt, nowMs) !== Number.NEGATIVE_INFINITY || !item.publishedAt);
   const freshnessFiltered = dateFiltered.filter((item) => {
-    if (!item.publishedAt) return true;
+    if (!item.publishedAt) return !mustHavePublishedAt;
     const published = publishedTime(item.publishedAt, nowMs);
     return published === Number.NEGATIVE_INFINITY || nowMs - published <= freshnessWindow * 60 * 60 * 1000;
   });
@@ -143,8 +149,15 @@ export function selectTrendItems(items: NormalizedItem[], topics: string[], filt
   // trends; their order, caps, exploration, and backfill flags never displace
   // a higher-ranked item from another section.
   const selected = ranked.slice(0, maxItems);
+  const unknownPublishedAtCount = dateFiltered.filter((item) => !item.publishedAt).length;
+  const staleDroppedCount = dateFiltered.filter((item) => {
+    if (!item.publishedAt) return false;
+    const published = publishedTime(item.publishedAt, nowMs);
+    return published !== Number.NEGATIVE_INFINITY && nowMs - published > freshnessWindow * 60 * 60 * 1000;
+  }).length;
   const filterStats: FilterStats = {
     maxAgeHours: freshnessWindow,
+    requirePublishedAt: mustHavePublishedAt,
     collectedCount: items.length,
     qualityPassedCount: qualityFiltered.length,
     freshnessPassedCount: freshnessFiltered.length,
@@ -152,8 +165,9 @@ export function selectTrendItems(items: NormalizedItem[], topics: string[], filt
     topicPassedCount: topicFiltered.length,
     exclusionPassedCount: candidates.length,
     effectiveCandidateCount: candidates.length,
-    unknownPublishedAtCount: freshnessFiltered.filter((item) => !item.publishedAt).length,
-    staleDroppedCount: dateFiltered.length - freshnessFiltered.length
+    unknownPublishedAtCount,
+    unknownPublishedAtDroppedCount: mustHavePublishedAt ? unknownPublishedAtCount : 0,
+    staleDroppedCount
   };
   if (sections.length === 0) {
     return { items: selected, selection: { candidateCount: items.length, selectedCount: selected.length, maxItems, requireTopicMatch: mustMatch, filterStats } };
@@ -220,7 +234,7 @@ function failureLine(failure: SourceFailure): string {
     `\`${safeText(failure.code)}\`): ${safeText(failure.message)}; ${retry}${fallback}`;
 }
 
-function itemBlock(item: NormalizedItem, index: number, headingLevel = 3): string {
+function itemBlock(item: NormalizedItem, index: number, headingLevel = 3, aiScore?: AiItemScore): string {
   const published = item.publishedAt ? safeText(item.publishedAt) : "unknown";
   const verification = `reachable=${item.verification.reachable}; status=${item.verification.status ?? "unknown"}; checked=${safeText(item.verification.checkedAt)}`;
   const signals = item.signals ? Object.entries(item.signals).map(([key, value]) => `${key}=${value}`).join(", ") : "none";
@@ -230,17 +244,18 @@ function itemBlock(item: NormalizedItem, index: number, headingLevel = 3): strin
     `- Source: \`${safeText(item.sourceId)}\``,
     `- Published: ${published}`,
     `- Popularity: ${signals}`,
+    ...(aiScore ? [`- AI score: ${aiScore.score}/100 — ${safeText(aiScore.reason)}`] : []),
     `- Excerpt: ${safeText(item.excerpt) || "(none)"}`,
     `- Verification: ${verification}`,
     ""
   ].join("\n");
 }
 
-function renderSelectedItems(input: DraftInput): string {
+function renderSelectedItems(input: DraftInput, aiScores?: ReadonlyMap<string, AiItemScore>): string {
   const sections = input.selection.sections;
   if (!sections || sections.length === 0) {
     return input.items.length > 0
-      ? input.items.map((item, index) => itemBlock(item, index + 1)).join("\n")
+      ? input.items.map((item, index) => itemBlock(item, index + 1, 3, aiScores?.get(item.url))).join("\n")
       : "No usable items were selected. Check source failures, topics, and filter settings.\n";
   }
 
@@ -250,13 +265,13 @@ function renderSelectedItems(input: DraftInput): string {
     const sectionItems = input.items.filter((item) => !renderedItems.has(item) && matchesSelectedSection(item, section));
     sectionItems.forEach((item) => renderedItems.add(item));
     const body = sectionItems.length > 0
-      ? sectionItems.map((item) => itemBlock(item, itemIndex++, 4)).join("\n")
+      ? sectionItems.map((item) => itemBlock(item, itemIndex++, 4, aiScores?.get(item.url))).join("\n")
       : "- No items selected.\n";
     return [`### ${safeText(section.label)} (${sectionItems.length})`, "", body].join("\n");
   });
   if (renderedItems.size < input.items.length) {
     const remaining = input.items.filter((item) => !renderedItems.has(item));
-    blocks.push(["### Other", "", remaining.map((item) => itemBlock(item, itemIndex++, 4)).join("\n")].join("\n"));
+    blocks.push(["### Other", "", remaining.map((item) => itemBlock(item, itemIndex++, 4, aiScores?.get(item.url))).join("\n")].join("\n"));
   }
   return blocks.join("\n");
 }
@@ -275,7 +290,7 @@ export function renderTemplateDraft(input: DraftInput): WriterOutput {
     `- Profile: \`${input.profileId}\` / \`${input.profileVersion}\``,
     `- Candidates: ${input.selection.candidateCount}; selected: ${input.selection.selectedCount}; maxItems: ${input.selection.maxItems}`,
     ...(input.selection.filterStats ? [
-      `- Effective candidates: ${input.selection.filterStats.effectiveCandidateCount}; after freshness: ${input.selection.filterStats.freshnessPassedCount}; topic matched: ${input.selection.filterStats.topicMatchedCount}; topic passed: ${input.selection.filterStats.topicPassedCount}; stale dropped: ${input.selection.filterStats.staleDroppedCount}; unknown published: ${input.selection.filterStats.unknownPublishedAtCount}; max age: ${input.selection.filterStats.maxAgeHours}h`
+      `- Effective candidates: ${input.selection.filterStats.effectiveCandidateCount}; after freshness: ${input.selection.filterStats.freshnessPassedCount}; topic matched: ${input.selection.filterStats.topicMatchedCount}; topic passed: ${input.selection.filterStats.topicPassedCount}; stale dropped: ${input.selection.filterStats.staleDroppedCount}; unknown published: ${input.selection.filterStats.unknownPublishedAtCount}; unknown dropped: ${input.selection.filterStats.unknownPublishedAtDroppedCount ?? 0}; max age: ${input.selection.filterStats.maxAgeHours}h`
     ] : []),
     `- Topics: ${input.topics.length > 0 ? input.topics.map((topic) => `\`${safeText(topic)}\``).join(", ") : "none"}`,
     "",
@@ -287,6 +302,52 @@ export function renderTemplateDraft(input: DraftInput): WriterOutput {
     ""
   ].join("\n");
   return { schemaVersion: "v1", title, markdown, writerId: "template", writerVersion: "v1", writerFallback: false };
+}
+
+export function createAiRankedDraftInput(input: DraftInput, items: readonly NormalizedItem[], maxItems: number): DraftInput {
+  const selected = [...items];
+  const sections = input.selection.sections?.map((section) => ({
+    ...section,
+    selectedCount: selected.filter((item) => matchesSelectedSection(item, section)).length
+  }));
+  return {
+    ...input,
+    selection: {
+      ...input.selection,
+      selectedCount: selected.length,
+      maxItems,
+      ...(sections ? { sections } : {})
+    },
+    items: selected
+  };
+}
+
+export function renderAiRankedDraft(
+  input: DraftInput,
+  args: { model: string; minimumScore: number; candidateCount: number; scores: ReadonlyMap<string, AiItemScore> }
+): WriterOutput {
+  const date = input.generatedAt.slice(0, 10);
+  const title = `Trending Radar ${date}`;
+  const failures = input.failures.length > 0 ? input.failures.map(failureLine).join("\n") : "- None";
+  const items = renderSelectedItems(input, args.scores);
+  const markdown = [
+    `# ${title}`,
+    "",
+    "## Run status",
+    `- Status: \`${input.status}\``,
+    `- Run: \`${input.runId}\``,
+    `- Profile: \`${input.profileId}\` / \`${input.profileVersion}\``,
+    `- AI ranking: model=${safeText(args.model)}; candidates=${args.candidateCount}; selected=${input.selection.selectedCount}; minimum score=${args.minimumScore}/100`,
+    `- Topics: ${input.topics.length > 0 ? input.topics.map((topic) => `\`${safeText(topic)}\``).join(", ") : "none"}`,
+    "",
+    "## Source failures",
+    failures,
+    "",
+    "## Selected trends",
+    items,
+    ""
+  ].join("\n");
+  return { schemaVersion: "v1", title, markdown, writerId: `provider-ranking:${args.model}`, writerVersion: "v1", writerFallback: false };
 }
 
 /** Keep the provider's prose readable while restoring a compact, deterministic fact ledger. */

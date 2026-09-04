@@ -55,7 +55,11 @@
   "topics": ["AI", "Agent", "MCP", "large language model", "developer tools", "open source", "software", "product"],
   "filter": {
     "maxItems": 50,
-    "requireTopicMatch": false
+    "requireTopicMatch": false,
+    "requirePublishedAt": true,
+    "maxAgeHours": 24,
+    "aiMaxItems": 15,
+    "aiMinimumScore": 70
   },
   "templateId": "default"
 }

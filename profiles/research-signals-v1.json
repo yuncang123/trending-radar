@@ -23,7 +23,11 @@
   "topics": ["AI", "Agent", "MCP", "large language model", "machine learning", "deep learning", "生成式 AI"],
   "filter": {
     "maxItems": 30,
-    "requireTopicMatch": false
+    "requireTopicMatch": false,
+    "requirePublishedAt": true,
+    "maxAgeHours": 24,
+    "aiMaxItems": 15,
+    "aiMinimumScore": 70
   },
   "templateId": "default"
 }

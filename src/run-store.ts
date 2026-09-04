@@ -1,4 +1,5 @@
 import type { DataAdapter } from "obsidian";
+import type { AiRankingArtifact } from "./ai-ranking.js";
 import type { DraftInput, NormalizedItem, RunLease, RunLedger, SourceFailure, WriterOutput } from "./types.js";
 
 export const LEASE_TTL_MS = 30_000;
@@ -169,6 +170,14 @@ export class VaultLedgerStore {
     await this.ensureDirectory(directory);
     const path = joinPath(directory, "writer-output.json");
     await this.safeWrite(path, `${JSON.stringify(output, null, 2)}\n`);
+    return path;
+  }
+
+  async saveAiRanking(runId: string, ranking: AiRankingArtifact): Promise<string> {
+    const directory = this.runDirectory(runId);
+    await this.ensureDirectory(directory);
+    const path = joinPath(directory, "ai-ranking.json");
+    await this.safeWrite(path, `${JSON.stringify(ranking, null, 2)}\n`);
     return path;
   }
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildAnthropicModelsRequest, buildAnthropicProbeRequest, buildAnthropicRequest, extractAnthropicText, extractProviderModels, PROVIDER_TIMEOUTS_MS } from "../src/provider.js";
+import { buildAnthropicModelsRequest, buildAnthropicProbeRequest, buildAnthropicRankingRequest, buildAnthropicRequest, extractAnthropicText, extractProviderModels, PROVIDER_TIMEOUTS_MS } from "../src/provider.js";
 import type { DraftInput } from "../src/types.js";
 
 const input: DraftInput = {
@@ -29,6 +29,26 @@ test("buildAnthropicRequest normalizes the gateway URL and keeps DraftInput in t
   assert.match(body.messages[0].content, /run-provider/);
   assert.match(body.messages[0].content, /Return one complete, readable Markdown daily report/);
   assert.equal(request.body.includes("secret-key"), false);
+});
+
+test("buildAnthropicRankingRequest sends a bounded fact projection and scoring rubric", () => {
+  const rankingInput: DraftInput = { ...input, items: [{
+    sourceId: "rss-a", sourceKind: "rss", title: "AI launch", url: "https://example.com/launch", externalId: null,
+    publishedAt: "2026-09-04T00:00:00Z", author: null, excerpt: "A launch", contentHash: "hash", retrievedAt: "2026-09-04T01:00:00Z", parserVersion: "v1",
+    verification: { reachable: true, status: 200, sourceRef: "feed", checkedAt: "2026-09-04T01:00:00Z", parserVersion: "v1" }
+  }] };
+  const request = buildAnthropicRankingRequest("https://gateway.example/api", "secret-key", "model-x", rankingInput, {
+    maxTokens: 1024,
+    sources: [{ sourceId: "rss-a", label: "Example", kind: "rss", introduction: "A primary technology feed.", keywords: ["technology"] }]
+  });
+  const body = JSON.parse(request.body) as { model: string; max_tokens: number; messages: Array<{ content: string }> };
+  assert.equal(body.model, "model-x");
+  assert.equal(body.max_tokens, 1024);
+  assert.match(body.messages[0]?.content ?? "", /trend importance 40/);
+  assert.match(body.messages[0]?.content ?? "", /AI launch/);
+  assert.match(body.messages[0]?.content ?? "", /A primary technology feed/);
+  assert.equal(request.body.includes("secret-key"), false);
+  assert.equal(request.body.includes("verification"), false);
 });
 
 test("extractAnthropicText joins text blocks and ignores non-text blocks", () => {

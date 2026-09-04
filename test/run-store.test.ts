@@ -85,3 +85,15 @@ test("draft input and external writer output are read from the same run director
   assert.equal((await store.loadWriterOutput("run-writer"))?.markdown, "# draft");
   assert.equal(await store.loadWriterOutput("missing"), undefined);
 });
+
+test("AI ranking audit is saved beside the run artifacts", async () => {
+  const adapter = new MemoryAdapter();
+  const store = new VaultLedgerStore(adapter as unknown as DataAdapter, "Trending Radar");
+  const path = await store.saveAiRanking("run-ranking", {
+    schemaVersion: "v1", runId: "run-ranking", model: "model-x", generatedAt: "2026-09-04T00:00:00Z",
+    minimumScore: 70, maxItems: 15, candidateCount: 1, selectedCount: 1,
+    scores: [{ index: 0, score: 90, eventKey: "launch", reason: "Important launch", sourceId: "rss-a", title: "Launch", url: "https://example.com/launch", selected: true }]
+  });
+  assert.equal(path, "Trending Radar/.trending-radar/runs/run-ranking/ai-ranking.json");
+  assert.match(adapter.files.get(path) ?? "", /"score": 90/);
+});

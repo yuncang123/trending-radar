@@ -36,7 +36,7 @@ test("Chinese translator labels source keywords", () => {
 
 test("run guidance keeps the external Writer out of the regular settings flow", () => {
   const description = createTranslator("zh-CN")("section_run_desc");
-  assert.equal(description, "手动运行，也可以用已配置的 AI Provider 改进已保存日报。");
+  assert.equal(description, "先采集确定性候选，再用已配置的 AI Provider 评分筛选。");
   assert.equal(description.includes("外部 Writer"), false);
 });
 

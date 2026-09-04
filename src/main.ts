@@ -1,4 +1,5 @@
 import { Notice, Plugin, requestUrl } from "obsidian";
+import { createAiRankingArtifact, parseAiScores, selectAiRankedItems } from "./ai-ranking.js";
 import { lookup } from "node:dns/promises";
 import { createAdapterRegistry } from "./adapters/index.js";
 import { attachLease, cancelRun, carryForwardReusableSources, createRunLedger, finalizeRunStatus, heartbeat, markRunInterrupted, markSourceCancelled, markSourceFailed, markSourceRunning, markSourceSucceeded, sourcesToRun } from "./ledger.js";
@@ -7,9 +8,10 @@ import { parseProfile, validateVaultRelativePath } from "./profile.js";
 import { createDefaultProfile, DEFAULT_PROFILE_PATH, reviseProfile } from "./profile-editor.js";
 import { LEASE_TTL_MS, LeaseHeldError, VaultLedgerStore } from "./run-store.js";
 import { TrendingRadarSettingTab } from "./settings-tab.js";
-import { buildAnthropicModelsRequest, buildAnthropicProbeRequest, buildAnthropicRequest, extractAnthropicText, extractProviderModels, PROVIDER_TIMEOUTS_MS, type ProviderModel } from "./provider.js";
+import { buildAnthropicModelsRequest, buildAnthropicProbeRequest, buildAnthropicRankingRequest, extractAnthropicText, extractProviderModels, PROVIDER_TIMEOUTS_MS, type ProviderModel } from "./provider.js";
+import { getSourceGuide } from "./source-guide.js";
 import type { FailureStage, FetchContext, NormalizedItem, Profile, RunLease, RunLedger, SourceFailure } from "./types.js";
-import { appendFactAppendix, createDraftInput, renderTemplateDraft, validateExternalWriterOutput } from "./writer.js";
+import { appendFactAppendix, createAiRankedDraftInput, createDraftInput, renderAiRankedDraft, renderTemplateDraft, validateExternalWriterOutput } from "./writer.js";
 import { createTranslator, resolveLocale, type LanguagePreference, type TranslationKey } from "./i18n.js";
 
 export interface TrendingRadarSettings {
@@ -442,22 +444,62 @@ export default class TrendingRadarPlugin extends Plugin {
       }
       this.log("ai_draft_started", { runId: latest.runId, provider: "anthropic-compatible", model });
       this.showRunNotice(this.translate("notice_ai_generating"));
-      const request = buildAnthropicRequest(baseUrl, apiKey, model, input);
+      if (input.items.length === 0) {
+        this.rejectAiDraft("no_candidates", this.translate("notice_no_ai_candidates"));
+        return;
+      }
+      const aiMaxItems = typeof effectiveProfile.filter.aiMaxItems === "number" ? effectiveProfile.filter.aiMaxItems : 15;
+      const aiMinimumScore = typeof effectiveProfile.filter.aiMinimumScore === "number" ? effectiveProfile.filter.aiMinimumScore : 70;
+      const request = buildAnthropicRankingRequest(baseUrl, apiKey, model, input, {
+        sources: effectiveProfile.sources.map((source) => {
+          const guide = getSourceGuide(source, this.getLocale());
+          return {
+            sourceId: source.sourceId,
+            label: typeof source.label === "string" && source.label.trim() ? source.label.trim() : source.sourceId,
+            kind: source.kind,
+            introduction: guide.intro,
+            keywords: guide.keywords
+          };
+        })
+      });
       const response = await this.requestProvider(request.url, request.headers, request.body, "POST", PROVIDER_TIMEOUTS_MS.aiDraft);
       if (response.status < 200 || response.status >= 300) {
         this.failAiDraft(latest.runId, model, startedAt, "http_error", response.status);
         return;
       }
-      const markdown = extractAnthropicText(response.text);
-      if (!markdown) {
+      const responseText = extractAnthropicText(response.text);
+      if (!responseText) {
         this.failAiDraft(latest.runId, model, startedAt, "empty_or_invalid_response");
         return;
       }
+      const scores = parseAiScores(responseText, input.items.length);
+      if (!scores) {
+        this.failAiDraft(latest.runId, model, startedAt, "invalid_ranking_response");
+        return;
+      }
+      const selected = selectAiRankedItems(input.items, scores, aiMinimumScore, aiMaxItems);
+      const rankedInput = createAiRankedDraftInput(input, selected.map((entry) => entry.item), aiMaxItems);
+      const scoreMap = new Map(selected.map((entry) => [entry.item.url, entry.score]));
+      const rankedDraft = renderAiRankedDraft(rankedInput, {
+        model,
+        minimumScore: aiMinimumScore,
+        candidateCount: input.items.length,
+        scores: scoreMap
+      });
+      const ranking = createAiRankingArtifact({
+        input,
+        model,
+        generatedAt: new Date().toISOString(),
+        minimumScore: aiMinimumScore,
+        maxItems: aiMaxItems,
+        scores,
+        selected
+      });
       const candidate = {
         schemaVersion: "v1" as const,
         title: `Trending Radar ${date}`,
-        markdown: appendFactAppendix(input, markdown),
-        writerId: `provider:${model}`,
+        markdown: appendFactAppendix(input, rankedDraft.markdown),
+        writerId: `provider-ranking:${model}`,
         writerVersion: "v1",
         writerFallback: false
       };
@@ -466,10 +508,11 @@ export default class TrendingRadarPlugin extends Plugin {
         this.failAiDraft(latest.runId, model, startedAt, "fact_anchor_validation_failed");
         return;
       }
+      const rankingFile = await store.saveAiRanking(latest.runId, ranking);
       const writerOutputFile = await store.saveWriterOutput(latest.runId, validation.output);
       const draftFile = await store.saveDailyDraft(date, validation.output.markdown);
-      this.log("ai_draft_succeeded", { runId: latest.runId, provider: "anthropic-compatible", model, elapsedMs: Date.now() - startedAt, writerOutputFile, draftFile });
-      this.finishRunNotice(this.translate("notice_ai_applied", { model }));
+      this.log("ai_draft_succeeded", { runId: latest.runId, provider: "anthropic-compatible", model, elapsedMs: Date.now() - startedAt, candidateCount: input.items.length, selectedCount: selected.length, minimumScore: aiMinimumScore, rankingFile, writerOutputFile, draftFile });
+      this.finishRunNotice(this.translate("notice_ai_applied", { model, count: selected.length }));
     } catch (error) {
       const code = classifyProviderError(error);
       this.failAiDraft(runIdForLog, model, startedAt, code);

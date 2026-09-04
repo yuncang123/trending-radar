@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appendFactAppendix, createDraftInput, renderTemplateDraft, selectTrendItems, validateExternalWriterOutput } from "../src/writer.js";
+import { appendFactAppendix, createAiRankedDraftInput, createDraftInput, renderAiRankedDraft, renderTemplateDraft, selectTrendItems, validateExternalWriterOutput } from "../src/writer.js";
 import type { NormalizedItem, SourceFailure, WriterOutput } from "../src/types.js";
 
 function item(sourceId: string, title: string, publishedAt: string | null, excerpt = ""): NormalizedItem {
@@ -23,7 +23,8 @@ test("writer scores topics, sorts deterministically, and applies maxItems", () =
     maxItems: 2,
     requireTopicMatch: false,
     filterStats: {
-      maxAgeHours: 336,
+      maxAgeHours: 24,
+      requirePublishedAt: true,
       collectedCount: 3,
       qualityPassedCount: 3,
       freshnessPassedCount: 3,
@@ -32,15 +33,16 @@ test("writer scores topics, sorts deterministically, and applies maxItems", () =
       exclusionPassedCount: 3,
       effectiveCandidateCount: 3,
       unknownPublishedAtCount: 0,
+      unknownPublishedAtDroppedCount: 0,
       staleDroppedCount: 0
     }
   });
   assert.deepEqual(selectTrendItems(input, ["software"], { maxItems: 50 }).items.map((entry) => entry.sourceId), ["b", "z", "a"]);
 });
 
-test("requireTopicMatch excludes non-matching items and puts null dates last", () => {
+test("requireTopicMatch excludes non-matching items and daily mode rejects null dates", () => {
   const selected = selectTrendItems([item("a", "No match", null), item("b", "Software update", null), item("c", "Software today", "2026-08-29T00:00:00Z")], ["software"], { requireTopicMatch: true });
-  assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["c", "b"]);
+  assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["c"]);
   assert.equal(selected.selection.candidateCount, 3);
 });
 
@@ -50,17 +52,19 @@ test("freshness filtering reports effective candidates and stale items", () => {
     item("stale", "AI stale", "2026-08-27T00:00:00Z"),
     item("unknown", "AI unknown", null)
   ], ["AI"], { maxAgeHours: 24, requireTopicMatch: true });
-  assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["fresh", "unknown"]);
+  assert.deepEqual(selected.items.map((entry) => entry.sourceId), ["fresh"]);
   assert.deepEqual(selected.selection.filterStats, {
     maxAgeHours: 24,
+    requirePublishedAt: true,
     collectedCount: 3,
     qualityPassedCount: 3,
-    freshnessPassedCount: 2,
-    topicMatchedCount: 2,
-    topicPassedCount: 2,
-    exclusionPassedCount: 2,
-    effectiveCandidateCount: 2,
+    freshnessPassedCount: 1,
+    topicMatchedCount: 1,
+    topicPassedCount: 1,
+    exclusionPassedCount: 1,
+    effectiveCandidateCount: 1,
     unknownPublishedAtCount: 1,
+    unknownPublishedAtDroppedCount: 1,
     staleDroppedCount: 1
   });
 });
@@ -200,13 +204,31 @@ test("same DraftInput renders byte-for-byte identical Markdown", () => {
 });
 
 test("provider prose can be followed by a deterministic fact appendix", () => {
-  const input = createDraftInput({ runId: "run-appendix", profileId: "default", profileVersion: "v1", status: "partial", generatedAt: "2026-08-29T00:10:00Z", templateId: "default", topics: ["software"], filter: {}, items: [item("rss-a", "Title", null)], failures: [failure] });
+  const input = createDraftInput({ runId: "run-appendix", profileId: "default", profileVersion: "v1", status: "partial", generatedAt: "2026-08-29T00:10:00Z", templateId: "default", topics: ["software"], filter: {}, items: [item("rss-a", "Title", "2026-08-29T00:00:00Z")], failures: [failure] });
   const markdown = appendFactAppendix(input, "# A readable provider summary");
   const output: WriterOutput = { schemaVersion: "v1", title: "Trending Radar 2026-08-29", markdown, writerId: "provider:model", writerVersion: "v1", writerFallback: false };
   assert.equal(validateExternalWriterOutput(input, output).ok, true);
   assert.match(markdown, /## Verified source facts/);
   assert.match(markdown, /rss-a \| Title \| https:\/\/example.com/);
   assert.match(markdown, /Failure: hn \| fetch \| TIMEOUT/);
+});
+
+test("AI-ranked draft shows only selected events with their score and reason", () => {
+  const original = createDraftInput({
+    runId: "run-ranked", profileId: "default", profileVersion: "v1", status: "completed", generatedAt: "2026-08-29T00:10:00Z",
+    templateId: "default", topics: ["AI"], filter: { maxItems: 50 },
+    items: [item("high", "Major AI launch", "2026-08-29T00:00:00Z"), item("low", "AI tutorial", "2026-08-29T00:00:00Z")], failures: []
+  });
+  const ranked = createAiRankedDraftInput(original, [original.items[0]!], 15);
+  const rendered = renderAiRankedDraft(ranked, {
+    model: "model-x", minimumScore: 70, candidateCount: 2,
+    scores: new Map([[ranked.items[0]!.url, { index: 0, score: 92, eventKey: "major-launch", reason: "Material product launch" }]])
+  });
+  assert.match(rendered.markdown, /AI score: 92\/100 — Material product launch/);
+  assert.match(rendered.markdown, /Major AI launch/);
+  assert.doesNotMatch(rendered.markdown, /AI tutorial/);
+  const candidate = { ...rendered, markdown: appendFactAppendix(original, rendered.markdown) };
+  assert.equal(validateExternalWriterOutput(original, candidate).ok, true);
 });
 
 test("external writer output is accepted only when it preserves run and fact anchors", () => {

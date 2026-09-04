@@ -91,7 +91,10 @@
     "reuseMaxAgeMinutes": 0,
     "excludeLowQuality": true,
     "rejectFuturePublishedAt": true,
-    "maxAgeHours": 336
+    "requirePublishedAt": true,
+    "maxAgeHours": 24,
+    "aiMaxItems": 15,
+    "aiMinimumScore": 70
   },
   "templateId": "default"
 }
