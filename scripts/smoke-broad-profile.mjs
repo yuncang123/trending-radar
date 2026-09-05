@@ -5,7 +5,7 @@ import { deduplicateItems, isLowQualityExcerpt } from "../dist-test/src/normaliz
 import { parseProfile } from "../dist-test/src/profile.js";
 import { createDraftInput, renderTemplateDraft } from "../dist-test/src/writer.js";
 
-const profile = parseProfile(JSON.parse(await readFile(new URL("../profiles/broad-trending-v1.json", import.meta.url), "utf8")));
+const profile = parseProfile(JSON.parse(await readFile(new URL("../profiles/broad-trending-v2.json", import.meta.url), "utf8")));
 const adapters = createAdapterRegistry();
 const failures = [];
 let items = [];
@@ -70,6 +70,8 @@ process.stdout.write(`quality: selectedLowQuality=${selectedLowQuality} selected
 for (const section of sections) {
   process.stdout.write(`section: ${section.sectionId} selected=${section.selectedCount}\n`);
 }
-process.stdout.write(`summary: healthy=${healthy}/${profile.sources.length} required=17 sections=${sections.length} (configured=4, other=optional) missingHeadings=${missingHeadings.length}\n`);
+const enabledSourceCount = profile.sources.filter((source) => source.enabled).length;
+const requiredHealthy = Math.max(10, Math.ceil(enabledSourceCount * 0.75));
+process.stdout.write(`summary: healthy=${healthy}/${enabledSourceCount} required=${requiredHealthy} sections=${sections.length} missingHeadings=${missingHeadings.length}\n`);
 
-if (healthy < 17 || sections.length < 4 || missingHeadings.length > 0 || input.selection.selectedCount === 0) process.exitCode = 1;
+if (healthy < requiredHealthy || sections.length < 5 || missingHeadings.length > 0 || input.selection.selectedCount === 0) process.exitCode = 1;

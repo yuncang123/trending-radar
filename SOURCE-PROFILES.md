@@ -5,7 +5,7 @@ available for independent health checks and focused runs; they are not separate 
 
 | Profile | Role | Smoke |
 |---|---|---|
-| `profiles/broad-trending-v1.json` | Combined daily run with four deterministic report Sections | `npm run smoke:broad` |
+| `profiles/broad-trending-v2.json` | Combined daily run with a curated default and opt-in discovery sources | `npm run smoke:broad` |
 | `profiles/chinese-tech-v2.json` | Stable Chinese technology baseline | `npm run smoke:cn` |
 | `profiles/chinese-third-party-v1.json` | Optional Chinese discovery and self-hosted extension | `npm run smoke:third-party` |
 | `profiles/global-tech-v1.json` | Global technology, industry, and developer coverage | `npm run smoke:global` |
@@ -17,16 +17,22 @@ recorded `6/6` healthy global sources and `2/2` healthy research sources. See
 [SMOKE-GLOBAL-SOURCES.md](SMOKE-GLOBAL-SOURCES.md) and
 [SMOKE-RESEARCH-SOURCES.md](SMOKE-RESEARCH-SOURCES.md) for the time-specific output.
 
-The broad Profile combines 21 sources into one candidate pool, forces a fresh fetch for every
+The current broad Profile contains 27 configured sources, with 14 direct RSS/API sources selected
+for high reading value enabled by default and 13 noisier or discovery-oriented feeds opt-in. It forces a fresh fetch for every
 manual run (`reuseMaxAgeMinutes=0`), rejects placeholder excerpts and future publication times,
-and requires a title/excerpt topic match. It ranks that complete pool globally by topic relevance
-and publication time, then classifies the selected trends into four presentation Sections:
-开源与开发、AI 前沿、产品与产业、媒体与发现. Section caps, exploration, and backfill are retained
-as legacy Profile fields for parsing but do not alter global selection; source failures remain
-visible at the top of the same report.
+and requires a title/excerpt topic match. It ranks the complete fetched pool globally by topic
+relevance and publication time, then classifies selected trends into five presentation Sections:
+中文核心与发现、代码与开发者、AI 研究与官方、全球深度科技与产业、社区与产品发现. Section caps
+are presentation metadata and do not create an artificial balance or displace higher-ranked items;
+source failures remain visible at the top of the same report.
 
-See [SMOKE-BROAD-PROFILE.md](SMOKE-BROAD-PROFILE.md) for the combined source, selection, and
-Obsidian end-to-end evidence.
+The default Chinese subset intentionally starts with Solidot、InfoQ 中文、美团技术团队 and 阮一峰
+科技爱好者周刊. 少数派、量子位、开源中国、博客园、IT之家、爱范儿、SegmentFault and Google News
+remain available in the catalog but are opt-in because their update mix or editorial signal is less
+consistent for a time-constrained daily read.
+
+See [SMOKE-BROAD-PROFILE-V2.md](SMOKE-BROAD-PROFILE-V2.md) for the current source and selection
+smoke evidence. `SMOKE-BROAD-PROFILE.md` remains the historical v1 run record.
 
 The broad GitHub source explicitly requests `sort=stars` as a popularity baseline. This is still
 not a growth-rate metric; repository velocity and research impact remain separate future source

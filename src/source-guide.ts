@@ -81,6 +81,11 @@ export const BUILT_IN_SOURCE_GUIDES = {
     "OpenAI 官方发布，涵盖研究、模型、产品、安全与公司动态。",
     ["OpenAI", "模型", "研究", "产品"]
   ),
+  "global-google-ai": defineGuide(
+    "Official Google AI and Gemini updates covering research, models, developer tools, and products.",
+    "Google AI 官方动态，覆盖研究、Gemini 模型、开发工具与产品。",
+    ["Google AI", "Gemini", "研究", "开发工具"]
+  ),
   "global-techcrunch": defineGuide(
     "Global technology business news focused on startups, funding, products, and major platform companies.",
     "聚焦创业公司、融资、科技产品与大型平台企业的全球科技商业媒体。",
@@ -95,6 +100,31 @@ export const BUILT_IN_SOURCE_GUIDES = {
     "In-depth reporting and analysis on computing, science, security, policy, and emerging technology.",
     "提供计算机、科学、安全、政策与新兴技术的深度报道和分析。",
     ["深度科技", "科学", "安全", "政策"]
+  ),
+  "global-wired": defineGuide(
+    "Technology, science, security, and culture reporting with a focus on consequential emerging trends.",
+    "关注新兴趋势影响的科技、科学、安全与文化深度报道。",
+    ["深度科技", "科学", "安全", "趋势"]
+  ),
+  "global-medium-ai": defineGuide(
+    "Community-published AI and engineering essays from Medium's topic feed; quality varies by author.",
+    "Medium AI 主题订阅中的社区文章，适合发现实践观点，但作者和质量差异较大。",
+    ["AI 实践", "工程文章", "社区观点", "发现层"]
+  ),
+  "global-hackernoon": defineGuide(
+    "A broad technology publication and community feed spanning AI, software, startups, and security.",
+    "覆盖 AI、软件、创业与安全的技术社区媒体，适合作为发现层而非权威源。",
+    ["技术媒体", "AI", "软件", "发现层"]
+  ),
+  "global-product-hunt": defineGuide(
+    "Official Product Hunt feed for newly launched products and startup discovery.",
+    "Product Hunt 官方产品发布流，用于发现新产品和早期创业项目。",
+    ["产品发现", "创业", "发布", "早期项目"]
+  ),
+  "global-v2ex": defineGuide(
+    "A Chinese developer community feed with discussions about software, tools, products, and practice.",
+    "中文开发者社区讨论流，覆盖软件、工具、产品与实践；可达性和内容稳定性需持续观察。",
+    ["开发者社区", "软件", "工具", "中文讨论"]
   ),
   "research-arxiv-cs-ai": defineGuide(
     "Recent arXiv papers in the Artificial Intelligence category (cs.AI).",

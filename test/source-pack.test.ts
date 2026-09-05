@@ -76,26 +76,33 @@ test("research signal profile uses bounded public Atom feeds", () => {
   assert.equal(/api.?key|authorization|credential|password|token/i.test(raw), false);
 });
 
-test("broad trending profile combines all source families into one sectioned run", () => {
-  const raw = readFileSync(resolve("profiles/broad-trending-v1.json"), "utf8");
+test("broad trending profile keeps a curated default and an opt-in discovery catalog", () => {
+  const raw = readFileSync(resolve("profiles/broad-trending-v2.json"), "utf8");
   const profile = parseProfile(JSON.parse(raw));
   const enabled = profile.sources.filter((source) => source.enabled);
   const sections = profile.filter.sections as Array<{ sourceIds: string[] }>;
 
-  assert.equal(profile.profileId, "broad-trending-v1");
-  assert.equal(enabled.length, 21);
-  assert.equal(enabled.some((source) => source.sourceId === "cn-juejin"), false);
+  assert.equal(profile.profileId, "broad-trending-v2");
+  assert.equal(profile.version, "v2");
+  assert.equal(profile.sources.length, 27);
+  assert.equal(enabled.length, 14);
+  assert.equal(enabled.some((source) => source.sourceId === "cn-sspai"), false);
+  assert.equal(enabled.some((source) => source.sourceId === "cn-ithome"), false);
   assert.ok(enabled.some((source) => source.sourceId === "cn-meituan-tech"));
   assert.ok(enabled.some((source) => source.sourceId === "cn-ruanyifeng-weekly"));
-  assert.equal(sections.length, 4);
-  assert.equal(new Set(sections.flatMap((section) => section.sourceIds)).size, enabled.length);
+  assert.ok(enabled.some((source) => source.sourceId === "global-google-ai"));
+  assert.ok(enabled.some((source) => source.sourceId === "global-wired"));
+  assert.equal(profile.topics.includes("product"), false);
+  assert.equal(profile.topics.includes("产品"), false);
+  assert.equal(sections.length, 5);
+  assert.equal(new Set(sections.flatMap((section) => section.sourceIds)).size, profile.sources.length);
   assert.equal(profile.filter.maxItemsPerSource, undefined);
   assert.equal(profile.templateId, "sectioned-v1");
   assert.equal(/api.?key|authorization|credential|password|token/i.test(raw), false);
 });
 
 test("the community-install default stays aligned with the broad release Profile", () => {
-  const broad = parseProfile(JSON.parse(readFileSync(resolve("profiles/broad-trending-v1.json"), "utf8")));
+  const broad = parseProfile(JSON.parse(readFileSync(resolve("profiles/broad-trending-v2.json"), "utf8")));
   const builtIn = createDefaultProfile("Custom Output");
 
   assert.equal(builtIn.outputDirectory, "Custom Output");

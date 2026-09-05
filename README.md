@@ -16,7 +16,7 @@ The settings page also supports optional Anthropic-compatible AI ranking. Config
 
 Next to `Model ID`, use `Refresh` to load model IDs from the configured Provider's `GET /v1/models` endpoint. The field remains editable and supports autocomplete. `Verify` sends a tiny fixed Messages request for the current model and reports whether that model returned usable text; this is a reachability check, not a quality or pricing guarantee. The model list is kept in memory only and is cleared when the key or base URL changes.
 
-Start from `profiles/example.json`, or create a Profile from the settings page. A newly created Profile is seeded with the 21-source broad catalog; an existing empty Profile can use `Add recommended sources` to restore it without replacing custom sources. Provider secrets do not belong in a shared Profile. Scheduling and publishing are outside this plugin.
+Start from `profiles/example.json`, or create a Profile from the settings page. A newly created Profile is seeded with the 27-source broad catalog: 14 direct RSS/API sources selected for high reading value are enabled by default and 13 noisier/discovery feeds are available but opt-in. An existing empty Profile can use `Add recommended sources` to restore it without replacing custom sources. Provider secrets do not belong in a shared Profile. Scheduling and publishing are outside this plugin.
 
 For a usable Chinese technology baseline, start from `profiles/chinese-tech-v2.json`. It enables ten
 direct public RSS feeds (少数派、Solidot、InfoQ 中文、量子位、开源中国、博客园、IT之家、美团技术团队、阮一峰科技爱好者周刊、爱范儿)
@@ -30,12 +30,16 @@ For optional third-party discovery, use `profiles/chinese-third-party-v1.json` a
 disabled self-hosted RSSHub template. This profile is intentionally separate from the default
 direct-feed baseline and is not included in the Chinese source smoke.
 
-For the intended broad daily report, use `profiles/broad-trending-v1.json`. It combines 21 Chinese,
+For the intended broad daily report, use `profiles/broad-trending-v2.json`. It combines Chinese core,
 global, research, GitHub, Hacker News, and discovery sources into one run and one candidate pool.
 Deterministic scoring retains a broad pool of up to 50 current candidates; optional AI ranking then
-keeps at most 15 unique events scoring 70 or higher. The report renders four Sections: 开源与开发、AI
-前沿、产品与产业、媒体与发现. The smaller Chinese, third-party, global,
-and research profiles remain useful as independently smokeable source packs.
+keeps at most 15 unique events scoring 70 or higher. The report renders five Sections: 中文核心与发现、
+代码与开发者、AI 研究与官方、全球深度科技与产业、社区与产品发现. The smaller Chinese,
+third-party, global, and research profiles remain useful as independently smokeable source packs.
+
+The exact 25-source Trending Digest baseline and the reasons some of its sources are not yet stable
+Trending Radar adapters are recorded in
+[`docs/research/trending-digest-source-baseline-2026-09-05.md`](docs/research/trending-digest-source-baseline-2026-09-05.md).
 
 Development follows the official Obsidian sample plugin shape:
 

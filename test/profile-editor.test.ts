@@ -7,8 +7,8 @@ test("a fresh community-install Profile includes the broad selectable source cat
   const profile = createDefaultProfile("Community Radar");
 
   assert.equal(profile.outputDirectory, "Community Radar");
-  assert.equal(profile.sources.length, 21);
-  assert.equal(profile.sources.filter((source) => source.enabled).length, 21);
+  assert.equal(profile.sources.length, 27);
+  assert.equal(profile.sources.filter((source) => source.enabled).length, 14);
   assert.ok(profile.sources.some((source) => source.sourceId === "cn-sspai"));
   assert.ok(profile.sources.some((source) => source.sourceId === "global-github-ai"));
   assert.ok(profile.sources.some((source) => source.sourceId === "global-hn-top"));
@@ -30,7 +30,7 @@ test("revising a Profile preserves extension fields and increments vN versions",
   assert.deepEqual(revised.topics, ["software", "open source"]);
   assert.equal(revised.filter.maxItems, 25);
   assert.equal(revised.filter.requireTopicMatch, true);
-  assert.equal((revised.filter.sections as unknown[]).length, 4);
+  assert.equal((revised.filter.sections as unknown[]).length, 5);
   assert.deepEqual((revised as unknown as Record<string, unknown>).extension, { owner: "community" });
 });
 

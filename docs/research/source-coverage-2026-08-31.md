@@ -1,5 +1,11 @@
 # Trending Radar 来源覆盖研究（2026-08-31）
 
+> This is a time-specific 2026-08-31 investigation snapshot. The 2026-09-05 curated source
+> baseline adds only directly verifiable RSS feeds (Google AI Blog、Wired、Medium、HackerNoon、
+> Product Hunt and V2EX) as opt-in/default candidates; see
+> `trending-digest-source-baseline-2026-09-05.md` for the corrected 25-source reference and
+> current default policy.
+
 ## 结论摘要
 
 当前 `chinese-tech-v2` 的 9 个直连 RSS 已覆盖中文科技、AI、开源和开发者内容，但还缺少三类“时代趋势”信号：
